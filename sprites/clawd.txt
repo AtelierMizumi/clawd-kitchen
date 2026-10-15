@@ -1,0 +1,34 @@
+# Clawd, built from parts by hooks/lib/clawd.ts.
+# Body 9×5: light top row (tinted by the breath), base, shadowed bottom.
+@frame clawd_body
+hhhhhhhhh
+ooooooooo
+ooooooooo
+ooooooooo
+sssssssss
+
+@frame clawd_arm
+oo
+
+@frame clawd_leg
+s
+s
+
+@frame clawd_eye
+k
+k
+
+# Compact size: 9×5 for a narrow band.
+@frame mini_idle
+.hhhhhhh.
+.okoooko.
+ooooooooo
+.sssssss.
+.s.s.s.s.
+
+# Chef hat: a puffy toque with a narrower band, 7 wide, sits on the 9-wide head.
+@frame chef_hat
+.cc.cc.
+ccccccc
+ccccccc
+.CCCCC.

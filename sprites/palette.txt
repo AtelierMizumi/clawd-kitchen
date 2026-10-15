@@ -1,0 +1,42 @@
+# char hex name
+# Clawd: highlight, base, shadow, eye
+h E8936F clawd-light
+o D97757 clawd
+s B35A3D clawd-shadow
+k 2B1F1A eye
+# Steel: light, mid, dark, deep
+W D8DDE3 steel-light
+w 9AA1AA steel
+d 5E6570 steel-dark
+D 33373D steel-deep
+# Wood: light, mid, dark
+T C08A5A wood-light
+t 9A6A43 wood
+b 6E4A30 wood-dark
+# Flame: core, mid, outer
+y FFE27A flame-core
+f FFA234 flame
+r F0532B flame-outer
+# Food
+g 7CC456 leaf
+G 3F8F35 leaf-dark
+m E2493B tomato
+c F4F0E6 plate
+C CFC6B4 plate-shadow
+# Pot enamel
+p 4F7FB8 pot
+P 365C8A pot-dark
+# Food: each has a base, a shade, a highlight and a dark outline in its own hue
+# (never black), so it stands out from the backsplash.
+m E2677A meat
+M B8444F meat-shade
+N 7A2B35 meat-outline
+f F6C9C2 fat
+F FFE3DC meat-highlight
+l C9EE8F cucumber-light
+I EAFBC8 cucumber-highlight
+L 1F5A2C cucumber-outline
+a F4A340 carrot
+A C9741F carrot-shade
+u FFD27A carrot-highlight
+E 7A3F12 carrot-outline

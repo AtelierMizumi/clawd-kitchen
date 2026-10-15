@@ -1,0 +1,13 @@
+{
+  "name": "clawd-kitchen",
+  "description": "A lively pixel-art Clawd kitchen above the Claude Code prompt (unofficial fan project).",
+  "owner": {
+    "name": "AtelierMizumi"
+  },
+  "plugins": [
+    {
+      "name": "clawd-kitchen",
+      "source": "./"
+    }
+  ]
+}

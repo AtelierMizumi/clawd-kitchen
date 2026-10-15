@@ -1,0 +1,8 @@
+{
+  "name": "clawd-kitchen",
+  "version": "0.1.0",
+  "description": "A lively pixel-art Clawd cooking above your prompt, reacting to what Claude Code is doing.",
+  "author": { "name": "thuanc177" },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,140 @@
+# Kitchen props, comfy size (12px tall scene, floor at y=11).
+
+@frame stove
+WWWWWWWWWWWWWWWWW
+wDWDDDDDDDDDDDWDw
+wdddddddddddddddw
+wdDDDDDDDDDDDDDdw
+wdddddddddddddddw
+
+@frame pan
+....dWWWWWd
+bbbbDdddddD
+.....DDDDD.
+
+@frame pot
+...d...
+.PPPPP.
+dpppppd
+.ppppp.
+.PPPPP.
+
+@frame rail
+wwwwwwwwwwwww
+
+@frame ladle
+w.
+w.
+ww
+
+@frame spatula
+b
+b
+W
+W
+
+@frame whisk
+w.
+W.
+WW
+
+@frame knife
+bbWWW
+
+@frame flame_a
+.r.r.r.
+rfrfrfr
+
+@frame flame_b
+r.r.r.r
+frfrfrf
+
+@frame shelf
+bbbbbbbbbb
+
+@frame jars
+.cc..mm..yy
+.pp.mmmm.ff
+.pp.mmmm.ff
+
+@frame bubble_dot
+cc
+CC
+
+# The prep table is two layers. The back (a dark backsplash behind the food, so the
+# food stays readable over the stove) is drawn before Clawd; the front (the table
+# top and its side) is drawn after him, so it hides his legs: it is in front of him.
+@frame prep_back
+ddddddddddd
+DDDDDDDDDDD
+DDDDDDDDDDD
+DDDDDDDDDDD
+
+@frame prep_front
+TTTTTTTTTTTTTTTTTTTTTTTT
+tbbbbbbbbbbbbbbbbbbbbbbt
+
+# The held knife: handle, then four rows of blade. (The lying one is 'knife'.)
+@frame knife_v
+b
+W
+W
+W
+w
+
+# Ingredients, 8 wide and 4 tall with a dark outline. Each comes with the flat cut
+# face the knife leaves (1 wide) and a slice (2 wide) for the pile.
+@frame meat
+.NNNNNN.
+NmmFFfmN
+NmfmmMMN
+.NNNNNN.
+
+@frame meat_cut
+N
+F
+f
+N
+
+@frame meat_slice
+NN
+Ff
+fm
+NN
+
+@frame cucumber
+.LLLLLL.
+LlIgggGL
+LgggGGGL
+.LLLLLL.
+
+@frame cucumber_cut
+L
+I
+l
+L
+
+@frame cucumber_slice
+LL
+Il
+lG
+LL
+
+@frame carrot
+.EEEEEE.
+EaauaaAE
+EAaaAAAE
+.EEEEEE.
+
+@frame carrot_cut
+E
+u
+a
+E
+
+@frame carrot_slice
+EE
+ua
+aA
+EE
+
