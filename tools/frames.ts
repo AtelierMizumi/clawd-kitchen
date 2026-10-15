@@ -6,14 +6,14 @@ import type { Mood } from '../hooks/lib/mood.ts'
 import { sceneCells } from '../hooks/lib/scene.ts'
 import { initialKitchen, kitchenStep, sinceArrived } from '../hooks/lib/table.ts'
 
-const [, , mood = 'idle', ms = '9000', step = '100', start = '0'] = process.argv
+const [, , mood = 'idle', ms = '9000', step = '100', start = '0', served = '1'] = process.argv
 const columns = DATA.scenes.comfy.width
 const frames = []
 let kitchen = initialKitchen(0)
 for (let t = 0; t < Number(start) + Number(ms); t += Number(step)) {
   kitchen = kitchenStep(kitchen, mood as Mood, t)
   if (t < Number(start)) continue
-  const { pose, action } = actionAt(mood as Mood, t, { tableX: kitchen.tableX, sinceArrived: sinceArrived(kitchen, t) })
+  const { pose, action } = actionAt(mood as Mood, t, { tableX: kitchen.tableX, sinceArrived: sinceArrived(kitchen, t), served: Number(served) })
   frames.push({ columns, cells: Array.from(sceneCells('comfy', pose, t, { action })) })
 }
 process.stdout.write(JSON.stringify(frames))

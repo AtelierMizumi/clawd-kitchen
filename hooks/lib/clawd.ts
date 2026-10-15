@@ -6,7 +6,7 @@ import type { Canvas, Color } from './raster'
 import { draw } from './raster'
 
 export type Eyes = 'open' | 'closed' | 'left' | 'right' | 'up' | 'down'
-export type Pose = { eyes: Eyes; arms: 'rest' | 'up'; legs: 'stand' | 'tap'; glow: number; reach?: number; phone?: boolean; toss?: boolean }
+export type Pose = { eyes: Eyes; arms: 'rest' | 'up'; legs: 'stand' | 'tap'; glow: number; reach?: number; phone?: boolean; toss?: boolean; shake?: boolean }
 
 export const CLAWD_WIDTH = 13
 export const CLAWD_HEIGHT = 7
@@ -59,7 +59,7 @@ export const drawClawd = (c: Canvas, x: number, y: number, pose: Pose): void => 
   const holding = pose.reach !== undefined
   const armRow = holding ? (pose.reach! <= -2 ? 0 : 1) : raised || pose.phone ? 1 : ARM_Y
   const rightUp = pose.toss || (raised && !holding && !pose.phone)
-  const rightY = y + ARM_Y - (rightUp ? 1 : 0)
+  const rightY = pose.shake ? y : y + ARM_Y - (rightUp ? 1 : 0)
   draw(c, arm, x, y + armRow)
   draw(c, arm, x + BODY_X + body.width, rightY)
   if (holding) {
@@ -67,6 +67,13 @@ export const drawClawd = (c: Canvas, x: number, y: number, pose: Pose): void => 
     const hi = Math.max(pose.reach!, armRow)
     for (let dy = lo; dy <= hi; dy++) set(c, x - 1, y + dy, BASE)
     set(c, x - 2, y + pose.reach!, BASE)
+  }
+
+  if (pose.shake) {
+    // The right forearm goes up beside the raised arm, and the hand holds the shaker.
+    const col = x + BODY_X + body.width + 2
+    for (let dy = -2; dy <= 0; dy++) set(c, col, y + dy, BASE)
+    set(c, col + 1, y - 2, BASE)
   }
 
   LEG_XS.forEach((lx, i) => {

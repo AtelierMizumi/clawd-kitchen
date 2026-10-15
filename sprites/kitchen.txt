@@ -152,16 +152,19 @@ v
 @frame phone_ink_b
 V
 
-# A bubble above the phone showing what is on it: a dark 7x6 screen for the dish.
+# A white thought bubble above the phone: a 9x8 body (its 7x6 inside holds the dish)
+# and a two-row tail whose point reaches down to the phone.
 @frame bubble
-.wwwwwww.
-wDDDDDDDw
-wDDDDDDDw
-wDDDDDDDw
-wDDDDDDDw
-wDDDDDDDw
-wDDDDDDDw
-.wwwwwww.
+.CCCCCCC.
+CZZZZZZZC
+CZZZZZZZC
+CZZZZZZZC
+CZZZZZZZC
+CZZZZZZZC
+CZZZZZZZC
+.CCCCCCC.
+...CZC...
+....C....
 
 @frame dish_burger
 .TTTTT.
@@ -171,13 +174,14 @@ uuuuuuu
 bbbbbbb
 .TTTTT.
 
+# The egg has an outline: its white is nearly the bubble's white.
 @frame dish_egg
-..ccc..
-.ccccc.
-ccYYccc
-ccYYccc
-.ccccc.
-..ccc..
+..CCC..
+.CcccC.
+CcYYccC
+CcYYccC
+.CcccC.
+..CCC..
 
 @frame dish_ramen
 ..Y.n..
@@ -187,3 +191,31 @@ ppppppp
 .ppppp.
 ..PPP..
 
+# A salt shaker: a steel cap on a glass body.
+@frame shaker
+www
+ccc
+CCC
+
+# A plate for the finished dish, one row, sitting on the table.
+@frame plate
+CcccccccC
+
+# What is left in the pan after an error: a black lump with a glowing ember.
+@frame burnt
+.DDDD.
+DDrDDD
+
+# A sleeping Clawd's z, two sizes.
+@frame zee_small
+ZZZ
+..Z
+.Z.
+ZZZ
+
+@frame zee_big
+ZZZZ
+...Z
+..Z.
+.Z..
+ZZZZ

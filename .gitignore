@@ -3,3 +3,4 @@ __pycache__/
 .pytest_cache/
 preview/out/
 /tsconfig.json
+node_modules/

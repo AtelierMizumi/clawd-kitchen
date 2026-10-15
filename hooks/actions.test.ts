@@ -2,9 +2,9 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { DATA } from './gen/data'
-import { CHOP_MS, CUTS_PER_ITEM, DISHES, LID_STEP_MS, NONE, PULL_STEP_MS, SIMMER_STEAM, STIR_MS, SWIPE_MS, actionAt } from './lib/actions'
+import { CHOP_MS, COUGH_STEP_MS, CUTS_PER_ITEM, BOUNCE_MS, DISHES, DROP_MS, LID_STEP_MS, NONE, ZEE_STEP_MS, PULL_STEP_MS, SHAKE_STEP_MS, SPARKLE_STEP_MS, SIMMER_STEAM, STIR_MS, SWIPE_MS, actionAt } from './lib/actions'
 import type { Kitchen } from './lib/actions'
-import { idlePose } from './lib/clawd'
+import { BREATH_MS, idlePose } from './lib/clawd'
 
 const comfy = DATA.scenes.comfy
 const { rest, work, foodY, knifeX, pileX } = comfy.table
@@ -13,6 +13,7 @@ const [potX0, potY0] = comfy.pot
 const clawdY = comfy.clawd[1]
 const away = (x: number): Kitchen => ({ tableX: x, sinceArrived: 0 })
 const atTable = (sinceArrived: number): Kitchen => ({ tableX: work, sinceArrived })
+const serving = (sinceArrived: number, served = 1): Kitchen => ({ tableX: work, sinceArrived, served })
 const pan = comfy.pan
 const panWidth = DATA.frames.pan.width
 
@@ -334,10 +335,174 @@ describe('simmer: the pot', () => {
   })
 })
 
-describe('moods without their own art yet', () => {
-  test('chop, serve, smoke and sleep fall back to the idle pose', () => {
-    for (const mood of ['chop', 'serve', 'smoke', 'sleep'] as const) {
-      expect(actionAt(mood, 700).pose).toEqual(idlePose(700))
+describe('season: shaking salt into the pan', () => {
+  const [clawdX, clawdY] = comfy.clawd
+  const at = (ms: number) => actionAt('season', ms)
+  const shakerAt = (i: number) => at(i * SHAKE_STEP_MS).action.shaker!
+
+  test('Clawd watches the pan with his right arm up, shaking', () => {
+    const { pose } = at(0)
+    expect(pose.eyes).toBe('right')
+    expect(pose.shake).toBe(true)
+    expect(pose.phone).toBeUndefined()
+  })
+
+  test('the shaker is held in the right hand, above the pan\'s handle, and nowhere else', () => {
+    const s = shakerAt(0)
+    expect(s.x).toBe(clawdX + 15)
+    expect([clawdY - 4, clawdY - 3]).toContain(s.y)
+    for (const mood of ['idle', 'typing', 'thinking', 'stir', 'simmer'] as const) expect(actionAt(mood, 0).action.shaker).toBeNull()
+    expect(NONE.shaker).toBeNull()
+  })
+
+  test('the shaker jiggles by a pixel every SHAKE_STEP_MS', () => {
+    const ys = [0, 1, 2, 3].map(i => shakerAt(i).y)
+    expect(new Set(ys).size).toBe(2)
+    expect(ys[0]).toBe(ys[2])
+    expect(ys[1]).toBe(ys[3])
+  })
+
+  test('three grains fall from its mouth into the pan, always below the shaker', () => {
+    for (let t = 0; t < 1000; t += 37) {
+      const { action } = at(t)
+      expect(action.bits).toHaveLength(3)
+      for (const b of action.bits) {
+        expect(b.y).toBeGreaterThanOrEqual(clawdY - 1)
+        expect(b.x).toBeGreaterThanOrEqual(clawdX + 16)
+        expect(b.x).toBeLessThan(panX + DATA.frames.pan.width)
+      }
     }
+    const ys = new Set([0, 100, 200, 300].map(t => at(t).action.bits[0]!.y))
+    expect(ys.size).toBeGreaterThan(1)
+  })
+
+  test('the table stays where it is', () => {
+    expect(actionAt('season', 0, away(-5)).action.tableX).toBe(-5)
   })
 })
+
+describe('serve: the finished dish', () => {
+  const { frontY, plateX, dishX } = comfy.table
+  const dishH = DATA.frames.dish_burger.height
+  const dishTop = frontY - 1 - dishH
+  const at = (ms: number, served = 1) => actionAt('serve', 0, serving(ms, served))
+
+  test('while the table is still coming, Clawd tugs it over and nothing is on it', () => {
+    const { pose, action } = actionAt('serve', 0, away(work - 6))
+    expect(pose.eyes).toBe('left')
+    expect(action.plate).toBeNull()
+    expect(action.tableX).toBe(work - 6)
+  })
+
+  test('once it is there Clawd cheers, arms up, feet tapping', () => {
+    const poses = [0, 1, 2, 3].map(i => at(i * PULL_STEP_MS * 2).pose)
+    expect(poses.every(p => p.arms === 'up' && p.eyes === 'open')).toBe(true)
+    expect(new Set(poses.map(p => p.legs))).toEqual(new Set(['stand', 'tap']))
+  })
+
+  test('the dish drops onto the plate from above, falling faster and faster, and stops on it', () => {
+    const dys = [0, 0.25, 0.5, 0.75, 1].map(f => at(Math.floor(f * DROP_MS)).action.plate!.dy)
+    expect(dys[0]).toBe(-dishH)
+    expect(dys).toEqual([...dys].sort((a, b) => a - b))
+    const steps = dys.slice(1).map((d, i) => d - dys[i]!)
+    expect(steps[steps.length - 2]!).toBeGreaterThanOrEqual(steps[0]!)
+    expect(at(DROP_MS).action.plate!.dy).toBeLessThanOrEqual(0)
+  })
+
+  test('it bounces up one pixel as it lands, then settles', () => {
+    expect(at(DROP_MS + 10).action.plate!.dy).toBe(-1)
+    expect(at(DROP_MS + BOUNCE_MS + 10).action.plate!.dy).toBe(0)
+    expect(at(DROP_MS + BOUNCE_MS + 2000).action.plate!.dy).toBe(0)
+  })
+
+  test('the dish is a different one each answer: burger, egg, ramen, burger again', () => {
+    expect([1, 2, 3, 4].map(n => at(0, n).action.plate!.dish)).toEqual(['burger', 'egg', 'ramen', 'burger'])
+    expect(at(0, 0).action.plate!.dish).toBe('burger')
+  })
+
+  test('sparkles twinkle around the dish once it has landed, two at a time, and not before', () => {
+    expect(at(0).action.bits).toEqual([])
+    expect(at(DROP_MS - 10).action.bits).toEqual([])
+    const after = DROP_MS + BOUNCE_MS
+    const frames = [0, 1, 2, 3].map(i => at(after + i * SPARKLE_STEP_MS + 5).action.bits)
+    for (const bits of frames) {
+      expect(bits).toHaveLength(2)
+      for (const b of bits) {
+        expect(b.x).toBeGreaterThanOrEqual(work + plateX - 2)
+        expect(b.x).toBeLessThanOrEqual(work + dishX + 7 + 2)
+        expect(b.y).toBeGreaterThanOrEqual(dishTop - 3)
+        expect(b.y).toBeLessThanOrEqual(frontY - 1)
+      }
+    }
+    const spots = new Set(frames.map(f => f.map(b => `${b.x},${b.y}`).join('|')))
+    expect(spots.size).toBeGreaterThan(1)
+  })
+})
+
+describe('smoke: a burnt dish', () => {
+  const at = (ms: number) => actionAt('smoke', ms)
+  const [panX0, panY0] = comfy.pan
+
+  test('Clawd coughs, eyes shut, fanning the smoke with one arm up and down', () => {
+    const poses = [0, 1, 2, 3].map(i => at(i * COUGH_STEP_MS).pose)
+    expect(poses.every(p => p.eyes === 'closed')).toBe(true)
+    expect(new Set(poses.map(p => p.arms))).toEqual(new Set(['rest', 'up']))
+    expect(poses[0]!.arms).not.toBe(poses[1]!.arms)
+  })
+
+  test('what is left in the pan is burnt', () => {
+    expect(at(0).action.isBurnt).toBe(true)
+    for (const mood of ['idle', 'typing', 'thinking', 'stir', 'simmer', 'serve', 'season'] as const) {
+      expect(actionAt(mood, 0).action.isBurnt).toBe(false)
+    }
+    expect(NONE.isBurnt).toBe(false)
+  })
+
+  test('dark smoke rises from the pan, much thicker than the steam', () => {
+    const smoke = at(0).action.smoke
+    expect(smoke).not.toBeNull()
+    expect(smoke!.count).toBeGreaterThanOrEqual(6)
+    expect(smoke!.x).toBeGreaterThanOrEqual(panX0)
+    expect(smoke!.x).toBeLessThan(panX0 + DATA.frames.pan.width)
+    expect(smoke!.y).toBeLessThanOrEqual(panY0)
+    expect(NONE.smoke).toBeNull()
+  })
+
+  test('the table stays where it is', () => {
+    expect(actionAt('smoke', 0, away(-7)).action.tableX).toBe(-7)
+  })
+})
+
+describe('sleep: dozing', () => {
+  const at = (ms: number) => actionAt('sleep', ms)
+
+  test('Clawd dozes, eyes shut, arms and feet still', () => {
+    const { pose } = at(1234)
+    expect(pose.eyes).toBe('closed')
+    expect(pose.arms).toBe('rest')
+    expect(pose.legs).toBe('stand')
+  })
+
+  test('breathing is slower than awake: a full breath takes twice as long', () => {
+    const glow = (t: number) => at(t).pose.glow
+    const awake = (t: number) => actionAt('idle', t).pose.glow
+    // Awake, glow has come back to its start after BREATH_MS; asleep it has not yet.
+    expect(awake(BREATH_MS)).toBeLessThan(0.001)
+    expect(glow(BREATH_MS)).toBeGreaterThan(0.99)
+    expect(glow(BREATH_MS * 2)).toBeLessThan(0.001)
+  })
+
+  test('a z floats up beside the head, growing from small to big and starting over', () => {
+    const zs = [0, 1, 2, 3, 4, 5].map(i => at(i * ZEE_STEP_MS).action.zee)
+    expect(zs.every(z => z !== null)).toBe(true)
+    const ys = zs.slice(0, 4).map(z => z!.y)
+    expect(ys).toEqual([...ys].sort((a, b) => b - a)) // rising: y decreases
+    expect(new Set(zs.map(z => z!.big))).toEqual(new Set([false, true]))
+    expect(zs[0]).toEqual(zs[4])
+  })
+
+  test('the table is away', () => {
+    expect(actionAt('sleep', 0, away(-9)).action.tableX).toBe(-9)
+  })
+})
+

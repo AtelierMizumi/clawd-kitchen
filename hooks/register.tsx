@@ -24,6 +24,8 @@ export const register: Register = on => {
   let kitchen: Kitchen = initialKitchen(0)
   let shown = ''
   let ticks = 0
+  // Answers served so far: the dish on the plate changes with each one.
+  let served = 0
   // Pieces of answer text seen so far; the tick turns a change into a `turn.text` event.
   let streamed = 0
   let seenStreamed = 0
@@ -42,6 +44,7 @@ export const register: Register = on => {
     const { pose, action } = actionAt(moodOf(state, now), t, {
       tableX: kitchen.tableX,
       sinceArrived: sinceArrived(kitchen, now),
+      served,
     })
     const cells = sceneCells(SCENE, pose, t, { action })
     return { columns: COLUMNS, rows: cells.length / 3 / COLUMNS, cells: encodeCells(cells) }
@@ -112,6 +115,7 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    if (e.reason === 'answer') served += 1
     state = step(state, { type: 'turn.complete', reason: e.reason }, await $.clock.now())
     return next(e)
   })

@@ -8,9 +8,9 @@ at the pan and tapping a foot while steam rises from the pot.
 
 **Status: v0.1 in progress.** Idle, typing (chopping at a prep table you pull
 over), thinking (browsing dishes on a phone and cooking them), simmering while the answer
-streams, and cooking with Bash work. Serving, burnt-dish and sleeping poses,
-sound, petting and a compact mode are being added one at a time, each only
-once it looks and sounds right.
+streams, cooking with Bash, seasoning on edits, serving finished dishes, burnt dish
+on error, and sleeping work. Sound, petting and a compact mode are being added
+one at a time, each only once it looks and sounds right.
 
 ## Requirements
 
@@ -123,6 +123,10 @@ Nothing to do: Clawd, in a chef hat, appears above the prompt when a session sta
 | Scrolls through dishes on a phone in his left hand, with a bubble above it showing the dish; then tosses its ingredient into the pan (burger, egg) or the pot (ramen) with his right hand | Claude is thinking |
 | Watches the pot, its lid rattling with steam squeezing out | The answer is streaming in |
 | Tosses the pan over the flames | Claude runs a Bash command |
+| Shakes salt into the pan | Claude edits or writes a file |
+| Pulls the table over and cheers while the dish drops onto a plate and sparkles twinkle | An answer is served |
+| Coughs and fans dark smoke away from a burnt pan | Claude errors or refuses |
+| Dozes with slow breaths while z's float up | Quiet for five minutes |
 
 ### Command
 
@@ -130,9 +134,6 @@ Nothing to do: Clawd, in a chef hat, appears above the prompt when a session sta
 `Clawd is in the simmer mood · answer text pieces: 42 · table: -9`. If Clawd
 does not react while the answer streams, run it right after the answer: a
 count of 0 means the mod was not told about the text.
-
-Editing tools, serving the answer, a burnt dish on errors and sleeping are
-recognised by the state machine but still draw the idle pose.
 
 ## Development
 

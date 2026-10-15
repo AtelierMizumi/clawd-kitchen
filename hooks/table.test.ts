@@ -57,9 +57,14 @@ describe('kitchenStep', () => {
     k = kitchenStep(k, 'idle', T0 + travelMs + 200)
     expect(k.tableX).toBe(work - dir * SLIDE_PX_PER_S * 0.1)
     expect(sinceArrived(k, T0 + travelMs + 200)).toBe(0)
-    for (const mood of ['thinking', 'stir', 'serve'] as const) {
+    for (const mood of ['thinking', 'stir', 'season'] as const) {
       const away = kitchenStep(kitchenStep(initialKitchen(T0), 'typing', T0 + 300), mood, T0 + 400)
       expect(away.tableX * dir).toBeLessThan((rest + dir * SLIDE_PX_PER_S * 0.3) * dir)
     }
+  })
+
+  test('serving the finished dish brings the table over too', () => {
+    const k = kitchenStep(initialKitchen(T0), 'serve', T0 + 100)
+    expect(k.tableX).toBe(rest + dir * SLIDE_PX_PER_S * 0.1)
   })
 })

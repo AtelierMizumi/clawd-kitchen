@@ -1,7 +1,7 @@
 // What Clawd is doing, as a pure state machine over Claude Code's events and
 // the clock. A State is plain data, so the hooks can keep it between calls.
 
-export type Mood = 'idle' | 'typing' | 'thinking' | 'stir' | 'chop' | 'serve' | 'smoke' | 'sleep' | 'simmer'
+export type Mood = 'idle' | 'typing' | 'thinking' | 'stir' | 'season' | 'serve' | 'smoke' | 'sleep' | 'simmer'
 export type Event =
   | { type: 'prompt.change'; isEmpty: boolean }
   | { type: 'turn.start' }
@@ -16,7 +16,7 @@ export const SERVE_MS = 3000
 export const SMOKE_MS = 3500
 export const SLEEP_AFTER_MS = 5 * 60_000
 
-type Burst = { mood: 'stir' | 'chop'; until: number }
+type Burst = { mood: 'stir' | 'season'; until: number }
 type After = { mood: 'serve' | 'smoke'; until: number }
 
 export type State = {
@@ -39,12 +39,12 @@ export const initialState = (now: number): State => ({
   after: null,
 })
 
-const COOKING: Record<string, 'stir' | 'chop'> = {
+const COOKING: Record<string, 'stir' | 'season'> = {
   Bash: 'stir',
-  Edit: 'chop',
-  Write: 'chop',
-  MultiEdit: 'chop',
-  NotebookEdit: 'chop',
+  Edit: 'season',
+  Write: 'season',
+  MultiEdit: 'season',
+  NotebookEdit: 'season',
 }
 
 /** The pose a tool call earns; tools without their own pose keep Clawd thinking. */
@@ -62,7 +62,7 @@ export const step = (s: State, e: Event, now: number): State => {
       return s.isTurnRunning ? { ...next, textUntil: now + TEXT_HOLD_MS } : next
     case 'tool.call': {
       const mood = toolMood(e.tool)
-      if (!s.isTurnRunning || (mood !== 'stir' && mood !== 'chop')) return next
+      if (!s.isTurnRunning || (mood !== 'stir' && mood !== 'season')) return next
       return { ...next, burst: { mood, until: now + COOK_HOLD_MS } }
     }
     case 'turn.complete': {

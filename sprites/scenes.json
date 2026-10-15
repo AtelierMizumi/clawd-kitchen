@@ -44,8 +44,8 @@
       9
     ],
     "bubble": [
-      12,
-      0
+      13,
+      -2
     ],
     "table": {
       "rest": -9,
@@ -58,7 +58,9 @@
       "knifeX": 16,
       "pileX": 1,
       "flatKnifeX": 19,
-      "flatKnifeY": 13
+      "flatKnifeY": 13,
+      "plateX": 9,
+      "dishX": 10
     },
     "phone": [
       16,
@@ -67,6 +69,7 @@
     "pot": [
       45,
       6
-    ]
+    ],
+    "bubbleTail": 2
   }
 }

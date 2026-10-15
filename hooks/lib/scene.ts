@@ -31,12 +31,8 @@ const foodColumn = (sprite: Sprite, col: number): Sprite => ({
   pixels: Array.from({ length: sprite.height }, (_, r) => sprite.pixels[r * sprite.width + col] ?? null),
 })
 
-/** The front of the table, drawn after Clawd so it hides his legs, with everything on it. */
-const drawFront = (c: Canvas, tab: TableSpec, action: Action, top: number): void => {
-  const x = Math.round(action.tableX)
-  const y = tab.foodY + top
-  draw(c, frame('prep_front'), x, tab.frontY + top)
-
+/** The ingredient on the table and the pile of slices cut from it. */
+const drawFood = (c: Canvas, tab: TableSpec, action: Action, x: number, y: number): void => {
   const { kind, cut, flying } = action.ingredient
   const food = frame(kind)
   const slice = frame(`${kind}_slice` as FrameName)
@@ -50,10 +46,26 @@ const drawFront = (c: Canvas, tab: TableSpec, action: Action, top: number): void
     for (let i = 0; i < keep - 1; i++) draw(c, foodColumn(food, i), x0 + i, y)
     draw(c, frame(`${kind}_cut` as FrameName), x0 + keep - 1, y)
   }
+}
+
+/** The front of the table, drawn after Clawd so it hides his legs, with everything on it. */
+const drawFront = (c: Canvas, tab: TableSpec, action: Action, top: number): void => {
+  const x = Math.round(action.tableX)
+  const y = tab.foodY + top
+  draw(c, frame('prep_front'), x, tab.frontY + top)
+
+  if (action.plate) {
+    // A finished dish is being served: the table is cleared and a plate sits on it.
+    const dish = frame(`dish_${action.plate.dish}` as FrameName)
+    draw(c, frame('plate'), x + tab.plateX, tab.frontY - 1 + top)
+    draw(c, dish, x + tab.dishX, tab.frontY - 1 - dish.height + action.plate.dy + top)
+  } else {
+    drawFood(c, tab, action, x, y)
+  }
 
   if (action.slice) draw(c, frame(`${action.slice.kind}_slice` as FrameName), action.slice.x, action.slice.y + top)
   if (action.knife) draw(c, frame('knife_v'), action.knife.x, action.knife.hy + top)
-  else draw(c, frame('knife'), x + tab.flatKnifeX, tab.flatKnifeY + top)
+  else if (!action.plate) draw(c, frame('knife'), x + tab.flatKnifeX, tab.flatKnifeY + top)
 }
 
 type SceneSpec = (typeof DATA.scenes)[SceneName]
@@ -90,6 +102,7 @@ export const renderScene = (name: SceneName, pose: Pose, action: Action = NONE, 
   const lid = frame('pot_lid')
   draw(c, frame('pot_body'), scene.pot[0], scene.pot[1] + lid.height + top)
   draw(c, lid, scene.pot[0], scene.pot[1] + action.lidDy + top)
+  if (action.isBurnt) draw(c, frame('burnt'), scene.pan[0] + 5, scene.pan[1] + top)
   drawBack(c, scene.table, action, top)
   drawClawd(c, scene.clawd[0], scene.clawd[1] + top, pose)
   drawFront(c, scene.table, action, top)
@@ -97,11 +110,14 @@ export const renderScene = (name: SceneName, pose: Pose, action: Action = NONE, 
     const y = bit.y + top
     if (bit.x >= 0 && bit.x < c.width && y >= 0 && y < c.height) c.px[y * c.width + bit.x] = bit.color
   }
+  if (action.zee) draw(c, frame(action.zee.big ? 'zee_big' : 'zee_small'), action.zee.x, action.zee.y + top)
+  if (action.shaker) draw(c, frame('shaker'), action.shaker.x, action.shaker.y + top)
   if (action.phone) drawPhone(c, scene, action, top)
   return c
 }
 
 const STEAM = { lifeMs: 2600, rise: 9, sway: 1, color: 0xa9b1bb }
+const SMOKE = { lifeMs: 2000, rise: 16, sway: 2, color: 0x4a4f58 }
 /** The scene as Raster cells at `t` ms: pixels, then braille steam in the empty cells. */
 export const sceneCells = (
   name: SceneName,
@@ -120,6 +136,10 @@ export const sceneCells = (
         steam(t + i * 911, { x: x * 2, y: (y + FX_ROWS * 2) * 2 + 1 }, { ...STEAM, count: count + (i === 0 ? action.potSteam : 0) }),
       ),
     )
+  }
+  if (action.smoke) {
+    const { x, y, count } = action.smoke
+    fx.push(...steam(t, { x: x * 2, y: (y + FX_ROWS * 2) * 2 + 1 }, { ...SMOKE, count }))
   }
   overlayFx(cells, scene.width, fx)
   return cells

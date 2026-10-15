@@ -44,3 +44,5 @@ E 7A3F12 carrot-outline
 v 9EC9FF phone-screen
 V 5E8FD0 phone-screen-accent
 Y FFC83D yolk
+Z FFFFFF bubble-fill
+

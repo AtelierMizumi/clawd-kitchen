@@ -22,8 +22,8 @@ const run = (events: [Event, number][], from: State = initialState(T0)) =>
 
 describe('toolMood', () => {
   test('Bash cooks in the pan', () => expect(toolMood('Bash')).toBe('stir'))
-  test('editing tools chop', () => {
-    for (const t of ['Edit', 'Write', 'MultiEdit', 'NotebookEdit']) expect(toolMood(t)).toBe('chop')
+  test('editing tools season the pan', () => {
+    for (const t of ['Edit', 'Write', 'MultiEdit', 'NotebookEdit']) expect(toolMood(t)).toBe('season')
   })
   test('other tools just keep Clawd thinking until they have their own pose', () => {
     for (const t of ['Read', 'Grep', 'WebSearch', 'mcp__x__y']) expect(toolMood(t)).toBe('thinking')
@@ -71,12 +71,12 @@ describe('moodOf', () => {
     expect(moodOf(s, T0 + 100 + COOK_HOLD_MS + 100)).toBe('stir')
   })
 
-  test('an Edit call chops', () => {
+  test('an Edit call seasons the pan', () => {
     const s = run([
       [{ type: 'turn.start' }, T0],
       [{ type: 'tool.call', tool: 'Edit' }, T0 + 50],
     ])
-    expect(moodOf(s, T0 + 60)).toBe('chop')
+    expect(moodOf(s, T0 + 60)).toBe('season')
   })
 
   test('typing while a turn runs does not interrupt the turn', () => {

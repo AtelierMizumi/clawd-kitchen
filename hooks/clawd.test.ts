@@ -285,3 +285,29 @@ describe('tossing with the right hand while holding the phone', () => {
   })
 })
 
+describe('shaking salt over the pan', () => {
+  const OX = 2
+  const OY = 5
+  const shaking = () => {
+    const c = createCanvas(CLAWD_WIDTH + OX + 4, CLAWD_HEIGHT + OY)
+    drawClawd(c, OX, OY, { ...rest, shake: true })
+    return c
+  }
+
+  test('the right arm is lifted to the body\'s top row and the left arm rests', () => {
+    const c = shaking()
+    expect(at(c, OX + 11, OY + 0)).toBe(BASE)
+    expect(at(c, OX + 11, OY + 2)).toBeNull()
+    expect(at(c, OX, OY + 2)).toBe(BASE)
+  })
+
+  test('a forearm of three pixels goes up beside it, with the hand one pixel further out', () => {
+    const c = shaking()
+    const col = OX + 13
+    for (const y of [-2, -1, 0]) expect(at(c, col, OY + y)).toBe(BASE)
+    expect(at(c, col, OY - 3)).toBeNull()
+    expect(at(c, col, OY + 1)).toBeNull()
+    expect(at(c, col + 1, OY - 2)).toBe(BASE)
+  })
+})
+

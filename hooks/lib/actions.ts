@@ -7,7 +7,7 @@ import type { Mood } from './mood'
 
 /** One flying pixel of food, in scene pixels. */
 export type Bit = { color: number; x: number; y: number }
-export type Kitchen = { tableX: number; sinceArrived: number }
+export type Kitchen = { tableX: number; sinceArrived: number; served?: number }
 export type Action = {
   tableX: number
   knife: { x: number; hy: number } | null
@@ -21,18 +21,34 @@ export type Action = {
   lidDy: number
   /** Extra steam particles over the pot. */
   potSteam: number
+  /** The pan holds a burnt lump. */
+  isBurnt: boolean
+  /** Dark smoke rising from here, or null. */
+  smoke: { x: number; y: number; count: number } | null
+  /** A sleeping Clawd's z, small or big, or null. */
+  zee: { x: number; y: number; big: boolean } | null
+  /** The finished dish on the table, dropped by `dy` pixels above its place, or null. */
+  plate: { dish: 'burger' | 'egg' | 'ramen'; dy: number } | null
+  /** The salt shaker in Clawd's right hand, or null. */
+  shaker: { x: number; y: number } | null
   /** The phone Clawd is scrolling, or null. */
   phone: { thumb: number | null; scroll: number } | null
   /** The dish shown in the bubble above the phone, or null for an empty bubble. */
   dish: 'burger' | 'egg' | 'ramen' | null
 }
 
-export const NONE: Action = { tableX: DATA.scenes.comfy.table.rest, knife: null, ingredient: { kind: 'meat', cut: 0, flying: false }, slice: null, panDy: 0, isFlameOn: false, bits: [], lidDy: 0, potSteam: 0, phone: null, dish: null }
+export const NONE: Action = { tableX: DATA.scenes.comfy.table.rest, knife: null, ingredient: { kind: 'meat', cut: 0, flying: false }, slice: null, panDy: 0, isFlameOn: false, bits: [], lidDy: 0, potSteam: 0, plate: null, isBurnt: false, smoke: null, zee: null, shaker: null, phone: null, dish: null }
 
 export const PULL_STEP_MS = 120
 export const CHOP_MS = 240
 export const CUTS_PER_ITEM = 4
 export const LID_STEP_MS = 140
+export const SHAKE_STEP_MS = 90
+export const COUGH_STEP_MS = 140
+export const ZEE_STEP_MS = 700
+export const DROP_MS = 350
+export const BOUNCE_MS = 120
+export const SPARKLE_STEP_MS = 160
 export const SIMMER_STEAM = 7
 export const SWIPE_MS = 2000
 export const DISHES = ['burger', 'egg', 'ramen'] as const
@@ -46,6 +62,7 @@ const KINDS = ['meat', 'cucumber', 'carrot'] as const
 const [POT_X, POT_Y] = DATA.scenes.comfy.pot
 const POT_W = DATA.frames.pot_lid.width
 const PUFF = 0xdfe3e8
+const SPARKLE = 0xffe27a
 const [CLAWD_X] = DATA.scenes.comfy.clawd
 const [PAN_X, PAN_Y] = DATA.scenes.comfy.pan
 
@@ -207,12 +224,89 @@ const simmer = (t: number): { pose: Pose; action: Action } => {
   }
 }
 
+// Seasoning (editing a file): the right hand shakes salt over the pan. The shaker
+// jiggles a pixel up and down and three grains fall from its mouth into the pan.
+const season = (t: number): { pose: Pose; action: Action } => {
+  const [sx, sy] = [CLAWD_X + 15, CLAWD_Y - 4]
+  const jiggle = Math.floor(t / SHAKE_STEP_MS) % 2
+  const bits: Bit[] = [0, 1, 2].map(i => {
+    const u = (t / 300 + i / 3) % 1
+    return { color: PUFF, x: CLAWD_X + 16 + Math.round(u * 3), y: CLAWD_Y - 1 + Math.round(u * 2) }
+  })
+  return {
+    pose: { eyes: 'right', arms: 'rest', legs: 'stand', glow: idlePose(t).glow, shake: true },
+    action: { ...NONE, shaker: { x: sx, y: sy + jiggle }, bits },
+  }
+}
+
+// Serving: the table comes over, a dish drops onto a plate on it (faster and faster),
+// bounces up a pixel as it lands, and sparkles twinkle round it while Clawd cheers.
+// The dish changes with each answer.
+const serve = (k: Kitchen): { pose: Pose; action: Action } => {
+  const s = k.sinceArrived
+  const dish = DISHES[Math.max(0, (k.served ?? 0) - 1) % DISHES.length]!
+  const height = DATA.frames.dish_burger.height
+  const landed = DROP_MS + BOUNCE_MS
+  const { frontY, plateX, dishX } = DATA.scenes.comfy.table
+  let dy = 0
+  if (s < DROP_MS) dy = -Math.round(height * (1 - (s / DROP_MS) ** 2))
+  else if (s < landed) dy = -1
+
+  const bits: Bit[] = []
+  if (s >= landed) {
+    // Six places round the dish; two of them twinkle at a time, stepping on.
+    const left = k.tableX + dishX
+    const top = frontY - 1 - height
+    const spots: [number, number][] = [
+      [left - 1, top + 1],
+      [left + 7, top + 2],
+      [left + 1, top - 1],
+      [left + 5, top - 2],
+      [left + 8, top + 4],
+      [left - 1, top + 4],
+    ]
+    const n = Math.floor((s - landed) / SPARKLE_STEP_MS)
+    for (const i of [2 * n, 2 * n + 1]) {
+      const [x, y] = spots[i % spots.length]!
+      bits.push({ color: SPARKLE, x, y })
+    }
+  }
+  void plateX
+  return {
+    pose: { eyes: 'open', arms: 'up', legs: Math.floor(s / (PULL_STEP_MS * 2)) % 2 === 0 ? 'stand' : 'tap', glow: idlePose(s).glow },
+    action: { ...NONE, tableX: k.tableX, plate: { dish, dy }, bits },
+  }
+}
+
+// Smoke (an error or a refusal): the dish is burnt and dark smoke pours from the pan.
+// Clawd coughs with his eyes shut, fanning the smoke away with an arm.
+const smoke = (t: number): { pose: Pose; action: Action } => ({
+  pose: {
+    eyes: 'closed',
+    arms: Math.floor(t / COUGH_STEP_MS) % 2 === 0 ? 'rest' : 'up',
+    legs: 'stand',
+    glow: idlePose(t).glow,
+  },
+  action: { ...NONE, isBurnt: true, smoke: { x: PAN_X + 5, y: PAN_Y, count: 8 } },
+})
+
+// Sleep (a long quiet): Clawd dozes at half the breathing rate, and a z floats up beside
+// his head, small then big, then starts again from the bottom.
+const sleep = (t: number): { pose: Pose; action: Action } => {
+  const n = Math.floor(t / ZEE_STEP_MS) % 4
+  return {
+    pose: { eyes: 'closed', arms: 'rest', legs: 'stand', glow: idlePose(t / 2).glow },
+    action: { ...NONE, zee: { x: CLAWD_X + 12 + (n % 2), y: CLAWD_Y - 3 - n, big: n >= 2 } },
+  }
+}
+
 export const actionAt = (
   mood: Mood,
   t: number,
   k: Kitchen = { tableX: NONE.tableX, sinceArrived: 0 },
 ): { pose: Pose; action: Action } => {
   if (mood === 'typing') return k.tableX < work ? pulling(t, k) : chopping(k)
+  if (mood === 'serve') return k.tableX < work ? pulling(t, k) : serve(k)
   const { pose, action } =
     mood === 'thinking'
       ? thinking(t)
@@ -220,6 +314,12 @@ export const actionAt = (
         ? stir(t)
         : mood === 'simmer'
           ? simmer(t)
-          : { pose: idlePose(t), action: NONE }
+          : mood === 'season'
+            ? season(t)
+            : mood === 'smoke'
+              ? smoke(t)
+              : mood === 'sleep'
+                ? sleep(t)
+                : { pose: idlePose(t), action: NONE }
   return { pose, action: { ...action, tableX: k.tableX } }
 }

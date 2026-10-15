@@ -23,7 +23,8 @@ export const slideTable = (x: number, target: number, dtMs: number): number => {
 export const initialKitchen = (now: number): Kitchen => ({ tableX: rest, at: now, arrivedAt: null })
 
 export const kitchenStep = (k: Kitchen, mood: Mood, now: number): Kitchen => {
-  const tableX = slideTable(k.tableX, mood === 'typing' ? work : rest, now - k.at)
+  // Typing brings the table to chop on; serving brings it to put the dish on.
+  const tableX = slideTable(k.tableX, mood === 'typing' || mood === 'serve' ? work : rest, now - k.at)
   const arrivedAt = tableX !== work ? null : (k.arrivedAt ?? now)
   return { tableX, at: now, arrivedAt }
 }
