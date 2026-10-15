@@ -28,10 +28,10 @@ p 4F7FB8 pot
 P 365C8A pot-dark
 # Food: each has a base, a shade, a highlight and a dark outline in its own hue
 # (never black), so it stands out from the backsplash.
-m E2677A meat
+n E2677A meat
 M B8444F meat-shade
 N 7A2B35 meat-outline
-f F6C9C2 fat
+x F6C9C2 fat
 F FFE3DC meat-highlight
 l C9EE8F cucumber-light
 I EAFBC8 cucumber-highlight
@@ -40,3 +40,7 @@ a F4A340 carrot
 A C9741F carrot-shade
 u FFD27A carrot-highlight
 E 7A3F12 carrot-outline
+# Phone and dishes
+v 9EC9FF phone-screen
+V 5E8FD0 phone-screen-accent
+Y FFC83D yolk

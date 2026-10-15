@@ -7,6 +7,7 @@ import {
   SERVE_MS,
   SLEEP_AFTER_MS,
   SMOKE_MS,
+  TEXT_HOLD_MS,
   TYPING_IDLE_MS,
   initialState,
   moodOf,
@@ -145,3 +146,68 @@ describe('moodOf', () => {
     expect(moodOf(s, T0 + 100_000 + SLEEP_AFTER_MS)).toBe('sleep')
   })
 })
+
+describe('simmering while the answer streams', () => {
+  const text: Event = { type: 'turn.text' }
+
+  test('text arriving during a turn makes the pot simmer, for a short hold after the last text', () => {
+    const s = run([
+      [{ type: 'turn.start' }, T0],
+      [text, T0 + 100],
+    ])
+    expect(moodOf(s, T0 + 100)).toBe('simmer')
+    expect(moodOf(s, T0 + 100 + TEXT_HOLD_MS - 1)).toBe('simmer')
+    expect(moodOf(s, T0 + 100 + TEXT_HOLD_MS)).toBe('thinking')
+  })
+
+  test('more text keeps the simmer going', () => {
+    const s = run([
+      [{ type: 'turn.start' }, T0],
+      [text, T0 + 100],
+      [text, T0 + 100 + TEXT_HOLD_MS - 50],
+    ])
+    expect(moodOf(s, T0 + 100 + TEXT_HOLD_MS + 100)).toBe('simmer')
+  })
+
+  test('before any text the turn is just thinking', () => {
+    const s = run([[{ type: 'turn.start' }, T0]])
+    expect(moodOf(s, T0 + 100)).toBe('thinking')
+  })
+
+  test('a cooking tool takes the pan while the text goes on, then the pot is back', () => {
+    const s = run([
+      [{ type: 'turn.start' }, T0],
+      [text, T0 + 100],
+      [{ type: 'tool.call', tool: 'Bash' }, T0 + 200],
+    ])
+    expect(moodOf(s, T0 + 300)).toBe('stir')
+    const later = step(s, text, T0 + 200 + COOK_HOLD_MS)
+    expect(moodOf(later, T0 + 200 + COOK_HOLD_MS + 10)).toBe('simmer')
+  })
+
+  test('text outside a turn does nothing', () => {
+    const s = run([[text, T0 + 100]])
+    expect(moodOf(s, T0 + 110)).toBe('idle')
+  })
+
+  test('the simmer ends with the turn, and a new turn starts without it', () => {
+    let s = run([
+      [{ type: 'turn.start' }, T0],
+      [text, T0 + 100],
+      [{ type: 'turn.complete', reason: 'answer' }, T0 + 150],
+    ])
+    expect(moodOf(s, T0 + 160)).toBe('serve')
+    s = step(s, { type: 'turn.start' }, T0 + 10_000)
+    expect(moodOf(s, T0 + 10_001)).toBe('thinking')
+  })
+
+  test('streaming text is activity, so the sleep timer starts from it', () => {
+    const s = run([
+      [{ type: 'turn.start' }, T0],
+      [text, T0 + 100],
+      [{ type: 'turn.complete', reason: 'aborted' }, T0 + 200],
+    ])
+    expect(moodOf(s, T0 + 200 + SLEEP_AFTER_MS - 1)).toBe('idle')
+  })
+})
+

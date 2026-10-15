@@ -7,8 +7,8 @@ at the pan and tapping a foot while steam rises from the pot.
 > Unofficial fan project, not affiliated with Anthropic. See [NOTICE.md](NOTICE.md).
 
 **Status: v0.1 in progress.** Idle, typing (chopping at a prep table you pull
-over), thinking and cooking with Bash work. Serving, burnt-dish and sleeping
-poses, phone-browsing for thinking, a simmering pot while the answer streams,
+over), thinking (browsing dishes on a phone and cooking them), simmering while the answer
+streams, and cooking with Bash work. Serving, burnt-dish and sleeping poses,
 sound, petting and a compact mode are being added one at a time, each only
 once it looks and sounds right.
 
@@ -120,8 +120,16 @@ Nothing to do: Clawd, in a chef hat, appears above the prompt when a session sta
 |---|---|
 | Breathes (the top of the body glows, arms lift on the inhale), blinks, glances at the pan, taps a foot | Idle |
 | Pulls the prep table over from the left, then chops meat, cucumber and carrot; each slice hops onto a fanned pile | You are typing in the prompt |
-| Looks up with a thought bubble that fills in | Claude is thinking |
+| Scrolls through dishes on a phone in his left hand, with a bubble above it showing the dish; then tosses its ingredient into the pan (burger, egg) or the pot (ramen) with his right hand | Claude is thinking |
+| Watches the pot, its lid rattling with steam squeezing out | The answer is streaming in |
 | Tosses the pan over the flames | Claude runs a Bash command |
+
+### Command
+
+`/clawd` prints what Clawd currently sees, for example
+`Clawd is in the simmer mood · answer text pieces: 42 · table: -9`. If Clawd
+does not react while the answer streams, run it right after the answer: a
+count of 0 means the mod was not told about the text.
 
 Editing tools, serving the answer, a burnt dish on errors and sleeping are
 recognised by the state machine but still draw the idle pose.

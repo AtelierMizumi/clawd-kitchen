@@ -118,29 +118,87 @@ describe('renderScene with an action', () => {
   })
 })
 
-describe('thought bubble', () => {
-  const [bx, by] = comfy.bubble
-  const dot = DATA.frames.bubble_dot
+describe('the phone and the bubble above it', () => {
+  const [phoneX, phoneY] = comfy.phone
+  const [bubbleX, bubbleY] = comfy.bubble
   const top = FX_ROWS * 2
-  const pixelAt = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
-  const filled = (n: number) => {
-    const c = renderScene('comfy', pose, { ...NONE, bubble: n })
-    return [0, 1, 2].filter(i => pixelAt(c, bx + i * (dot.width + 1), by) === dot.pixels[0])
-  }
-
-  test('draws one 2px dot per filled step, one pixel apart, above the head', () => {
-    expect(dot.width).toBe(2)
-    expect(filled(1)).toEqual([0])
-    expect(filled(2)).toEqual([0, 1])
-    expect(filled(3)).toEqual([0, 1, 2])
+  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
+  const phone = DATA.frames.phone
+  const bubble = DATA.frames.bubble
+  const inkA = DATA.frames.phone_ink_a.pixels[0]
+  const inkB = DATA.frames.phone_ink_b.pixels[0]
+  const thumb = DATA.frames.clawd_arm.pixels[0]
+  const scrolling = (thumbRow: number | null, scroll: number, dish: Action['dish'] = null): Action => ({
+    ...NONE,
+    phone: { thumb: thumbRow, scroll },
+    dish,
   })
 
-  test('draws nothing for an empty bubble', () => {
-    expect(filled(0)).toEqual([])
+  test('nothing is drawn for either while Clawd is not on his phone', () => {
+    const c = renderScene('comfy', pose)
+    expect(px(c, phoneX, phoneY)).not.toBe(phone.pixels[0])
+    expect(px(c, bubbleX + 1, bubbleY)).not.toBe(bubble.pixels[1])
   })
 
-  test('sits clear of Clawd: its lowest row ends above his head', () => {
-    expect(by + dot.height).toBeLessThan(comfy.clawd[1])
+  test('the phone is drawn at its place, with its frame', () => {
+    const c = renderScene('comfy', pose, scrolling(null, 0))
+    for (let y = 0; y < phone.height; y++) expect(px(c, phoneX, phoneY + y)).toBe(phone.pixels[y * phone.width])
+    expect(px(c, phoneX + phone.width - 1, phoneY + phone.height - 1)).toBe(phone.pixels[phone.pixels.length - 1])
+  })
+
+  test('the screen rows alternate between two inks, and scrolling swaps which row has which', () => {
+    for (const scroll of [0, 1, 2, 3]) {
+      const c = renderScene('comfy', pose, scrolling(null, scroll))
+      for (let r = 0; r < 4; r++) {
+        const want = (r + scroll) % 2 === 0 ? inkA : inkB
+        expect(px(c, phoneX + 1, phoneY + 1 + r)).toBe(want)
+        expect(px(c, phoneX + 2, phoneY + 1 + r)).toBe(want)
+      }
+    }
+  })
+
+  test('the thumb is a pixel of Clawd on the screen at its row, and gone when lifted', () => {
+    for (const row of [0, 1, 2, 3]) {
+      expect(px(renderScene('comfy', pose, scrolling(row, 0)), phoneX + 2, phoneY + 1 + row)).toBe(thumb)
+    }
+    const c = renderScene('comfy', pose, scrolling(null, 0))
+    for (let r = 0; r < 4; r++) expect(px(c, phoneX + 2, phoneY + 1 + r)).not.toBe(thumb)
+  })
+
+  test('the bubble sits right above the phone and shows the dish inside its frame', () => {
+    expect(bubbleY + bubble.height).toBe(phoneY)
+    for (const dish of ['burger', 'egg', 'ramen'] as const) {
+      const sprite = DATA.frames[`dish_${dish}` as const]
+      const c = renderScene('comfy', pose, scrolling(null, 0, dish))
+      for (let y = 0; y < sprite.height; y++) {
+        for (let x = 0; x < sprite.width; x++) {
+          const want = sprite.pixels[y * sprite.width + x]
+          if (want !== null) expect(px(c, bubbleX + 1 + x, bubbleY + 1 + y)).toBe(want)
+        }
+      }
+    }
+  })
+
+  test('the bubble is an empty screen while there is no dish', () => {
+    const c = renderScene('comfy', pose, scrolling(null, 0, null))
+    expect(px(c, bubbleX, bubbleY + 3)).toBe(bubble.pixels[3 * bubble.width])
+    expect(px(c, bubbleX + 3, bubbleY + 3)).toBe(bubble.pixels[3 * bubble.width + 3])
+  })
+
+  test('the dishes fit the bubble\'s screen exactly, so the frame is never covered', () => {
+    for (const dish of ['burger', 'egg', 'ramen'] as const) {
+      const sprite = DATA.frames[`dish_${dish}` as const]
+      expect(sprite.width).toBe(bubble.width - 2)
+      expect(sprite.height).toBe(bubble.height - 2)
+    }
+  })
+
+  test('the phone sits against Clawd\'s raised hand, clear of the shelf and the hat', () => {
+    expect(phoneX + phone.width).toBe(comfy.clawd[0])
+    const jars = DATA.frames.jars
+    const jarsX = comfy.props.find(p => p[0] === 'jars')![1] as number
+    expect(bubbleX).toBeGreaterThanOrEqual(jarsX + jars.width)
+    expect(bubbleX + bubble.width).toBeLessThanOrEqual(comfy.clawd[0] + 3)
   })
 })
 
@@ -154,7 +212,7 @@ describe('the prep table', () => {
   const held = DATA.frames.knife_v
   const food = (kind: 'meat' | 'cucumber' | 'carrot') => DATA.frames[kind]
   const at = (tableX: number, extra: Partial<Action> = {}): Action => ({ ...NONE, tableX, ...extra })
-  const holding = (extra: Partial<Action> = {}): Action => at(tab.work, { knife: { x: tab.work + tab.knifeX, hy: 1 }, ...extra })
+  const holding = (extra: Partial<Action> = {}): Action => at(tab.work, { knife: { x: tab.work + tab.knifeX, hy: tab.foodY - 3 }, ...extra })
   const rows = 4
   const colOf = (sprite: { width: number; pixels: readonly (number | null)[] }, i: number) =>
     Array.from({ length: rows }, (_, r) => sprite.pixels[r * sprite.width + i])
@@ -232,8 +290,9 @@ describe('the prep table', () => {
   })
 
   test('the held knife is drawn from its handle row, and then the lying one is gone', () => {
-    const c = renderScene('comfy', pose, at(tab.work, { knife: { x: tab.work + tab.knifeX, hy: 3 } }))
-    for (let i = 0; i < held.height; i++) expect(px(c, tab.work + tab.knifeX, 3 + i)).toBe(held.pixels[i])
+    const hy = tab.foodY - 3
+    const c = renderScene('comfy', pose, at(tab.work, { knife: { x: tab.work + tab.knifeX, hy } }))
+    for (let i = 0; i < held.height; i++) expect(px(c, tab.work + tab.knifeX, hy + i)).toBe(held.pixels[i])
     expect(px(c, tab.work + tab.flatKnifeX, tab.flatKnifeY)).not.toBe(flat.pixels[0])
   })
 
@@ -263,3 +322,41 @@ describe('the prep table', () => {
     for (const ex of [4, 8]) for (const r of [2, 3]) expect(px(c, cx + ex, cy + r)).toBe(0x2b1f1a)
   })
 })
+
+describe('the pot', () => {
+  const [potX, potY] = comfy.pot
+  const top = FX_ROWS * 2
+  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
+  const lid = DATA.frames.pot_lid
+  const body = DATA.frames.pot_body
+  const isBraille = (cp: number) => cp > 0x2800 && cp <= 0x28ff
+
+  test('is a lid on a body, drawn at its anchor', () => {
+    const c = renderScene('comfy', pose)
+    for (let x = 0; x < lid.width; x++) expect(px(c, potX + x, potY)).toBe(lid.pixels[x])
+    for (let x = 0; x < body.width; x++) expect(px(c, potX + x, potY + lid.height)).toBe(body.pixels[x])
+  })
+
+  test('the lid lifts by lidDy and leaves a gap, while the body stays', () => {
+    const c = renderScene('comfy', pose, { ...NONE, lidDy: -1 })
+    expect(px(c, potX + 3, potY - 1)).toBe(lid.pixels[3])
+    expect(px(c, potX + 3, potY + 1)).not.toBe(lid.pixels[lid.width + 3])
+    expect(px(c, potX + 3, potY + lid.height)).toBe(body.pixels[3])
+  })
+
+  test('extra steam thickens the cloud over the pot', () => {
+    const potCells = (potSteam: number) => {
+      let n = 0
+      for (let t = 0; t < 2600; t += 100) {
+        const cells = sceneCells('comfy', pose, t, { action: { ...NONE, potSteam } })
+        for (let col = potX - 2; col < potX + lid.width + 2; col++) {
+          for (let row = 0; row < 6; row++) if (isBraille(cells[(row * comfy.width + col) * 3]!)) n++
+        }
+      }
+      return n
+    }
+    expect(potCells(0)).toBeGreaterThan(0)
+    expect(potCells(7)).toBeGreaterThan(potCells(0))
+  })
+})
+

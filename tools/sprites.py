@@ -32,6 +32,8 @@ def parse_palette(text):
             raise ValueError(f"'{TRANSPARENT}' is reserved for transparency")
         if len(char) != 1:
             raise ValueError(f"palette key {char!r} must be one character")
+        if char in palette:
+            raise ValueError(f"palette key {char!r} is defined twice")
         try:
             if len(hexcode) != 6:
                 raise ValueError

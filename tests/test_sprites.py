@@ -88,3 +88,8 @@ def test_emit_ts_flattens_pixels_row_major_with_null_for_transparent():
     payload = json.loads(re.search(r"export const DATA = (\{.*\}) as const", src, re.S).group(1))
     assert payload["frames"]["a"] == {"width": 2, "height": 2, "pixels": [None, 0xD97757, 0x1F1A17, None]}
     assert payload["scenes"] == scenes
+
+
+def test_palette_rejects_a_character_defined_twice():
+    with pytest.raises(ValueError, match=r"'o'.*twice"):
+        parse_palette("o D97757 clawd\nk 1F1A17 eye\no E2677A meat")

@@ -6,7 +6,7 @@ import type { Canvas, Color } from './raster'
 import { draw } from './raster'
 
 export type Eyes = 'open' | 'closed' | 'left' | 'right' | 'up' | 'down'
-export type Pose = { eyes: Eyes; arms: 'rest' | 'up'; legs: 'stand' | 'tap'; glow: number; reach?: number }
+export type Pose = { eyes: Eyes; arms: 'rest' | 'up'; legs: 'stand' | 'tap'; glow: number; reach?: number; phone?: boolean; toss?: boolean }
 
 export const CLAWD_WIDTH = 13
 export const CLAWD_HEIGHT = 7
@@ -52,16 +52,21 @@ export const drawClawd = (c: Canvas, x: number, y: number, pose: Pose): void => 
   const top = mix(BASE, LIGHT, pose.glow)
   for (let i = 0; i < body.width; i++) set(c, x + BODY_X + i, y, top)
 
-  // Reaching with a knife: the left arm is raised, with a forearm up beside it and
-  // the hand one pixel further out; the right arm rests.
+  // Reaching with a knife: the left arm is raised, with a forearm beside it and the
+  // hand one pixel further out; the right arm rests. The shoulder lifts with a high
+  // knife, so the forearm stays short (three pixels at the most).
   const raised = pose.arms === 'up'
-  const leftY = y + ARM_Y - (raised || pose.reach !== undefined ? 1 : 0)
-  const rightY = y + ARM_Y - (raised && pose.reach === undefined ? 1 : 0)
-  draw(c, arm, x, leftY)
+  const holding = pose.reach !== undefined
+  const armRow = holding ? (pose.reach! <= -2 ? 0 : 1) : raised || pose.phone ? 1 : ARM_Y
+  const rightUp = pose.toss || (raised && !holding && !pose.phone)
+  const rightY = y + ARM_Y - (rightUp ? 1 : 0)
+  draw(c, arm, x, y + armRow)
   draw(c, arm, x + BODY_X + body.width, rightY)
-  if (pose.reach !== undefined) {
-    for (let dy = pose.reach; dy <= ARM_Y - 1; dy++) set(c, x - 1, y + dy, BASE)
-    set(c, x - 2, y + pose.reach, BASE)
+  if (holding) {
+    const lo = Math.min(pose.reach!, armRow)
+    const hi = Math.max(pose.reach!, armRow)
+    for (let dy = lo; dy <= hi; dy++) set(c, x - 1, y + dy, BASE)
+    set(c, x - 2, y + pose.reach!, BASE)
   }
 
   LEG_XS.forEach((lx, i) => {

@@ -17,27 +17,44 @@ export type Action = {
   panDy: number
   isFlameOn: boolean
   bits: Bit[]
-  /** Dots filled in the thought bubble, 0 to 3. */
-  bubble: number
+  /** Pixels the pot's lid is lifted: 0 shut, -1 rattling up. */
+  lidDy: number
+  /** Extra steam particles over the pot. */
+  potSteam: number
+  /** The phone Clawd is scrolling, or null. */
+  phone: { thumb: number | null; scroll: number } | null
+  /** The dish shown in the bubble above the phone, or null for an empty bubble. */
+  dish: 'burger' | 'egg' | 'ramen' | null
 }
 
-export const NONE: Action = { tableX: DATA.scenes.comfy.table.rest, knife: null, ingredient: { kind: 'meat', cut: 0, flying: false }, slice: null, panDy: 0, isFlameOn: false, bits: [], bubble: 0 }
+export const NONE: Action = { tableX: DATA.scenes.comfy.table.rest, knife: null, ingredient: { kind: 'meat', cut: 0, flying: false }, slice: null, panDy: 0, isFlameOn: false, bits: [], lidDy: 0, potSteam: 0, phone: null, dish: null }
 
 export const PULL_STEP_MS = 120
 export const CHOP_MS = 240
 export const CUTS_PER_ITEM = 4
-export const BUBBLE_STEP_MS = 420
+export const LID_STEP_MS = 140
+export const SIMMER_STEAM = 7
+export const SWIPE_MS = 2000
+export const DISHES = ['burger', 'egg', 'ramen'] as const
 export const STIR_MS = 1200
 
 const FOOD = [0xe2493b, 0x7cc456, 0xffe27a] // tomato, leaf, corn
-const BUBBLE = [1, 2, 3, 0]
 
 const [, CLAWD_Y] = DATA.scenes.comfy.clawd
 const { work, foodY, knifeX, pileX } = DATA.scenes.comfy.table
 const KINDS = ['meat', 'cucumber', 'carrot'] as const
+const [POT_X, POT_Y] = DATA.scenes.comfy.pot
+const POT_W = DATA.frames.pot_lid.width
+const PUFF = 0xdfe3e8
+const [CLAWD_X] = DATA.scenes.comfy.clawd
+const [PAN_X, PAN_Y] = DATA.scenes.comfy.pan
 
-/** The knife's handle row through one chop: raised, halfway down, down, halfway up. */
-const KNIFE_HY = [1, 3, 5, 3]
+/**
+ * The knife's handle row through one chop: raised (blade clear of the food), halfway
+ * down, down (blade on the board), halfway up. Measured from the food, so the stroke
+ * is the same wherever the table stands.
+ */
+const KNIFE_HY = [foodY - 3, foodY - 1, foodY + 1, foodY - 1]
 
 // The table is still coming: Clawd leans toward it and tugs with quick steps.
 const pulling = (t: number, k: Kitchen): { pose: Pose; action: Action } => ({
@@ -86,10 +103,65 @@ const chopping = (k: Kitchen): { pose: Pose; action: Action } => {
   }
 }
 
-const thinking = (t: number): { pose: Pose; action: Action } => ({
-  pose: { eyes: 'up', arms: 'up', legs: 'stand', glow: idlePose(t).glow },
-  action: { ...NONE, bubble: BUBBLE[Math.floor(t / BUBBLE_STEP_MS) % BUBBLE.length]! },
-})
+// What goes in for each dish, and where: burger and egg in the pan, ramen in the pot.
+// The colour is read off the dish picture so the food matches what is on the phone.
+const DISH_FOOD = {
+  burger: { color: DATA.frames.dish_burger.pixels[4 * 7 + 3] as number, into: 'pan' },
+  egg: { color: DATA.frames.dish_egg.pixels[2 * 7 + 2] as number, into: 'pan' },
+  ramen: { color: DATA.frames.dish_ramen.pixels[1 * 7 + 2] as number, into: 'pot' },
+} as const
+
+const TOSS_FROM = 0.5
+const TOSS_TO = 0.8
+const SPLASH_TO = 0.9
+
+// Thinking: Clawd scrolls through dishes on his phone and cooks them. Each cycle:
+//   0 – 0.2   the swipe: the thumb flicks up the screen and the bubble is empty
+//   0.2 – 0.5 the new dish pops in and the thumb lifts away
+//   0.5 – 0.8 the right hand tosses the dish's ingredient into the pan or the pot
+//   0.8 – 0.9 it lands: three drops splash from the pan, or the pot's lid pops
+const thinking = (t: number): { pose: Pose; action: Action } => {
+  const cycle = Math.floor(t / SWIPE_MS)
+  const phase = (t % SWIPE_MS) / SWIPE_MS
+  const isSwiping = phase < 0.2
+  const step = Math.min(3, Math.floor((phase / 0.2) * 4))
+  const dish = DISHES[cycle % DISHES.length]!
+  const food = DISH_FOOD[dish]
+  const isTossing = phase >= TOSS_FROM && phase < TOSS_TO
+  const isSplashing = phase >= TOSS_TO && phase < SPLASH_TO
+  const [tx, ty] = food.into === 'pot' ? [POT_X + 3, POT_Y] : [PAN_X + 7, PAN_Y]
+
+  let bits: Bit[] = []
+  let lidDy = 0
+  if (isTossing) {
+    const u = (phase - TOSS_FROM) / (TOSS_TO - TOSS_FROM)
+    const [hx, hy] = [CLAWD_X + 13, CLAWD_Y + 1]
+    bits = [{ color: food.color, x: Math.round(hx + (tx - hx) * u), y: Math.round(hy + (ty - hy) * u - Math.sin(Math.PI * u) * 5) }]
+  } else if (isSplashing && food.into === 'pan') {
+    bits = [
+      { color: food.color, x: tx - 1, y: ty - 1 },
+      { color: food.color, x: tx + 1, y: ty - 1 },
+      { color: food.color, x: tx, y: ty - 2 },
+    ]
+  } else if (isSplashing) {
+    lidDy = -1
+    bits = [
+      { color: PUFF, x: POT_X - 1, y: POT_Y },
+      { color: PUFF, x: POT_X + POT_W, y: POT_Y },
+    ]
+  }
+
+  return {
+    pose: { eyes: 'left', arms: 'rest', legs: 'stand', glow: idlePose(t).glow, phone: true, toss: isTossing },
+    action: {
+      ...NONE,
+      phone: { thumb: isSwiping ? 3 - step : null, scroll: isSwiping ? step : 0 },
+      dish: isSwiping ? null : dish,
+      bits,
+      lidDy,
+    },
+  }
+}
 
 // The pan sits, rises in two steps, hangs at the top, then drops back.
 const panDyAt = (p: number): number => {
@@ -119,6 +191,22 @@ const stir = (t: number): { pose: Pose; action: Action } => {
   }
 }
 
+// Simmering: the answer is streaming, so the pot bubbles. The lid rattles up and
+// down and steam squeezes out on both sides whenever it is up.
+const simmer = (t: number): { pose: Pose; action: Action } => {
+  const isUp = Math.floor(t / LID_STEP_MS) % 2 === 1
+  const bits: Bit[] = isUp
+    ? [
+        { color: PUFF, x: POT_X - 1, y: POT_Y },
+        { color: PUFF, x: POT_X + POT_W, y: POT_Y },
+      ]
+    : []
+  return {
+    pose: { eyes: 'right', arms: 'rest', legs: 'stand', glow: idlePose(t).glow },
+    action: { ...NONE, lidDy: isUp ? -1 : 0, potSteam: SIMMER_STEAM, bits },
+  }
+}
+
 export const actionAt = (
   mood: Mood,
   t: number,
@@ -126,6 +214,12 @@ export const actionAt = (
 ): { pose: Pose; action: Action } => {
   if (mood === 'typing') return k.tableX < work ? pulling(t, k) : chopping(k)
   const { pose, action } =
-    mood === 'thinking' ? thinking(t) : mood === 'stir' ? stir(t) : { pose: idlePose(t), action: NONE }
+    mood === 'thinking'
+      ? thinking(t)
+      : mood === 'stir'
+        ? stir(t)
+        : mood === 'simmer'
+          ? simmer(t)
+          : { pose: idlePose(t), action: NONE }
   return { pose, action: { ...action, tableX: k.tableX } }
 }

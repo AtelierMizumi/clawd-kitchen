@@ -6,6 +6,7 @@ import { initialState, moodOf, step } from './lib/mood'
 import type { State } from './lib/mood'
 import { encodeCells } from './lib/raster'
 import { sceneCells } from './lib/scene'
+import { statusText } from './lib/status'
 import { initialKitchen, kitchenStep, sinceArrived } from './lib/table'
 import type { Kitchen } from './lib/table'
 
@@ -23,8 +24,20 @@ export const register: Register = on => {
   let kitchen: Kitchen = initialKitchen(0)
   let shown = ''
   let ticks = 0
+  // Pieces of answer text seen so far; the tick turns a change into a `turn.text` event.
+  let streamed = 0
+  let seenStreamed = 0
+
+  // Fold any answer text seen since the last look into the state. Every reader calls
+  // this first, so none of them can miss text because another one has not run yet.
+  const sync = (now: number) => {
+    if (streamed === seenStreamed) return
+    seenStreamed = streamed
+    state = step(state, { type: 'turn.text' }, now)
+  }
 
   const draw = (now: number) => {
+    sync(now)
     const t = now - startedAt
     const { pose, action } = actionAt(moodOf(state, now), t, {
       tableX: kitchen.tableX,
@@ -35,6 +48,7 @@ export const register: Register = on => {
   }
 
   on('session.start', async ($, e, next) => {
+    await $.command.register({ name: 'clawd', description: 'Show what Clawd sees' })
     startedAt = await $.clock.now()
     state = initialState(startedAt)
     kitchen = initialKitchen(startedAt)
@@ -43,6 +57,7 @@ export const register: Register = on => {
       ticks += 1
       const requestId = band
       void $.clock.now().then(now => {
+        sync(now)
         const mood = moodOf(state, now)
         kitchen = kitchenStep(kitchen, mood, now)
         const isCalm = (mood === 'idle' || mood === 'sleep') && kitchen.tableX === TABLE_REST
@@ -72,6 +87,23 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     state = step(state, { type: 'turn.start' }, await $.clock.now())
     return next(e)
+  })
+
+  // The answer streams in as `text` chunks: only count them, the tick does the rest.
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId !== undefined) return yield* next(e)
+    const stream = next(e)
+    for await (const chunk of stream) {
+      if (chunk.kind === 'text') streamed += 1
+      yield chunk
+    }
+    return await stream.result
+  })
+
+  on('command.run', { command: 'clawd' }, async $ => {
+    const now = await $.clock.now()
+    sync(now)
+    return { text: statusText(moodOf(state, now), kitchen.tableX, streamed) }
   })
 
   on('tool.call', async ($, e, next) => {

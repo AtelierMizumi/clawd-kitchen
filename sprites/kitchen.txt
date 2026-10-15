@@ -12,9 +12,12 @@ wdddddddddddddddw
 bbbbDdddddD
 .....DDDDD.
 
-@frame pot
+# The pot is two parts so its lid can rattle.
+@frame pot_lid
 ...d...
 .PPPPP.
+
+@frame pot_body
 dpppppd
 .ppppp.
 .PPPPP.
@@ -57,9 +60,6 @@ bbbbbbbbbb
 .pp.mmmm.ff
 .pp.mmmm.ff
 
-@frame bubble_dot
-cc
-CC
 
 # The prep table is two layers. The back (a dark backsplash behind the food, so the
 # food stays readable over the stove) is drawn before Clawd; the front (the table
@@ -74,11 +74,9 @@ DDDDDDDDDDD
 TTTTTTTTTTTTTTTTTTTTTTTT
 tbbbbbbbbbbbbbbbbbbbbbbt
 
-# The held knife: handle, then four rows of blade. (The lying one is 'knife'.)
+# The held knife: handle, then two rows of blade. (The lying one is 'knife'.)
 @frame knife_v
 b
-W
-W
 W
 w
 
@@ -86,20 +84,20 @@ w
 # face the knife leaves (1 wide) and a slice (2 wide) for the pile.
 @frame meat
 .NNNNNN.
-NmmFFfmN
-NmfmmMMN
+NnnFFxnN
+NnxnnMMN
 .NNNNNN.
 
 @frame meat_cut
 N
 F
-f
+x
 N
 
 @frame meat_slice
 NN
-Ff
-fm
+Fx
+xn
 NN
 
 @frame cucumber
@@ -137,4 +135,55 @@ EE
 ua
 aA
 EE
+
+# The phone Clawd scrolls with his left hand, 4 wide; the screen is the 2x4 inside.
+@frame phone
+dddd
+dvvd
+dvvd
+dvvd
+dvvd
+dddd
+
+# Two inks the screen's rows alternate between as it scrolls.
+@frame phone_ink_a
+v
+
+@frame phone_ink_b
+V
+
+# A bubble above the phone showing what is on it: a dark 7x6 screen for the dish.
+@frame bubble
+.wwwwwww.
+wDDDDDDDw
+wDDDDDDDw
+wDDDDDDDw
+wDDDDDDDw
+wDDDDDDDw
+wDDDDDDDw
+.wwwwwww.
+
+@frame dish_burger
+.TTTTT.
+TTTTTTT
+ggggggg
+uuuuuuu
+bbbbbbb
+.TTTTT.
+
+@frame dish_egg
+..ccc..
+.ccccc.
+ccYYccc
+ccYYccc
+.ccccc.
+..ccc..
+
+@frame dish_ramen
+..Y.n..
+.aaaaa.
+.aaaaa.
+ppppppp
+.ppppp.
+..PPP..
 

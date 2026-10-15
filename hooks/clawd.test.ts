@@ -150,29 +150,47 @@ describe('reaching with the knife', () => {
     drawClawd(c, OX, OY, { ...rest, reach })
     return c
   }
+  // The shoulder lifts with a high knife, so the forearm stays short.
+  const armRow = (reach: number) => (reach <= -2 ? 0 : 1)
+  const forearm = (c: ReturnType<typeof createCanvas>) => [...Array(CLAWD_HEIGHT + OY).keys()].filter(y => at(c, OX - 1, y) === BASE)
 
-  test('the left arm is raised and the right one rests', () => {
-    const c = reaching(-2)
-    expect(at(c, OX, OY + 1)).toBe(BASE)
-    expect(at(c, OX, OY + 2)).toBeNull()
-    expect(at(c, OX + 11, OY + 2)).toBe(BASE)
-    expect(at(c, OX + 11, OY + 1)).toBeNull()
+  test('the left arm lifts to the body\'s top row when the knife is high, and sits one row lower otherwise', () => {
+    for (const reach of [-2, 0, 2]) {
+      const c = reaching(reach)
+      const row = armRow(reach)
+      expect(at(c, OX, OY + row)).toBe(BASE)
+      expect(at(c, OX, OY + (1 - row))).toBeNull()
+    }
   })
 
-  test('a forearm runs up from the raised arm to the hand row, with the hand one pixel further out', () => {
-    for (const reach of [-4, -2, 0]) {
+  test('the right arm rests whatever the left one does', () => {
+    for (const reach of [-2, 0, 2]) {
       const c = reaching(reach)
-      for (let y = reach; y <= 1; y++) expect(at(c, OX - 1, OY + y)).toBe(BASE)
-      expect(at(c, OX - 1, OY + reach - 1)).toBeNull()
-      expect(at(c, OX - 2, OY + reach)).toBe(BASE)
-      expect(at(c, OX - 2, OY + reach + 1)).toBeNull()
+      expect(at(c, OX + 11, OY + 2)).toBe(BASE)
+      expect(at(c, OX + 11, OY + 1)).toBeNull()
     }
+  })
+
+  test('a forearm runs between the hand row and the arm row, with the hand one pixel further out', () => {
+    for (const reach of [-2, 0, 2]) {
+      const c = reaching(reach)
+      const lo = Math.min(reach, armRow(reach))
+      const hi = Math.max(reach, armRow(reach))
+      for (let y = lo; y <= hi; y++) expect(at(c, OX - 1, OY + y)).toBe(BASE)
+      expect(at(c, OX - 1, OY + lo - 1)).toBeNull()
+      expect(at(c, OX - 1, OY + hi + 1)).toBeNull()
+      expect(at(c, OX - 2, OY + reach)).toBe(BASE)
+    }
+  })
+
+  test('the forearm is never more than three pixels long through a whole chop', () => {
+    for (const reach of [-2, 0, 2]) expect(forearm(reaching(reach)).length).toBeLessThanOrEqual(3)
   })
 
   test('without reach there is nothing beside the left arm', () => {
     const c = createCanvas(CLAWD_WIDTH + OX, CLAWD_HEIGHT + OY)
     drawClawd(c, OX, OY, rest)
-    for (let y = 0; y < CLAWD_HEIGHT + OY; y++) expect(at(c, OX - 1, y)).toBeNull()
+    expect(forearm(c)).toEqual([])
   })
 })
 
@@ -222,3 +240,48 @@ describe('the chef hat', () => {
     }
   })
 })
+
+describe('holding a phone', () => {
+  const OX = 2
+  const withPhone = () => {
+    const c = createCanvas(CLAWD_WIDTH + OX, CLAWD_HEIGHT)
+    drawClawd(c, OX, 0, { ...rest, phone: true })
+    return c
+  }
+
+  test('the left hand is raised to hold it and the right arm rests', () => {
+    const c = withPhone()
+    expect(at(c, OX, 1)).toBe(BASE)
+    expect(at(c, OX, 2)).toBeNull()
+    expect(at(c, OX + 11, 2)).toBe(BASE)
+    expect(at(c, OX + 11, 1)).toBeNull()
+  })
+
+  test('there is no forearm: the phone sits right against the raised arm', () => {
+    const c = withPhone()
+    for (let y = 0; y < CLAWD_HEIGHT; y++) expect(at(c, OX - 1, y)).toBeNull()
+  })
+})
+
+describe('tossing with the right hand while holding the phone', () => {
+  const OX = 2
+  const tossing = (toss: boolean) => {
+    const c = createCanvas(CLAWD_WIDTH + OX, CLAWD_HEIGHT)
+    drawClawd(c, OX, 0, { ...rest, phone: true, toss })
+    return c
+  }
+
+  test('the right arm is raised to throw and the left one still holds the phone', () => {
+    const c = tossing(true)
+    expect(at(c, OX + 11, 1)).toBe(BASE)
+    expect(at(c, OX + 11, 2)).toBeNull()
+    expect(at(c, OX, 1)).toBe(BASE)
+  })
+
+  test('without the toss the right arm rests', () => {
+    const c = tossing(false)
+    expect(at(c, OX + 11, 2)).toBe(BASE)
+    expect(at(c, OX + 11, 1)).toBeNull()
+  })
+})
+

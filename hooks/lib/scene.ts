@@ -56,6 +56,27 @@ const drawFront = (c: Canvas, tab: TableSpec, action: Action, top: number): void
   else draw(c, frame('knife'), x + tab.flatKnifeX, tab.flatKnifeY + top)
 }
 
+type SceneSpec = (typeof DATA.scenes)[SceneName]
+
+/** Clawd's phone with its scrolling screen and thumb, and the bubble above it showing the dish. */
+const drawPhone = (c: Canvas, scene: SceneSpec, action: Action, top: number): void => {
+  const { thumb, scroll } = action.phone!
+  const [px, py] = scene.phone
+  const phone = frame('phone')
+  draw(c, phone, px, py + top)
+  // The screen's rows alternate between two inks; scrolling swaps which is which.
+  const inks = [frame('phone_ink_a'), frame('phone_ink_b')]
+  for (let row = 0; row < phone.height - 2; row++) {
+    const ink = inks[(row + scroll) % 2]!
+    draw(c, ink, px + 1, py + 1 + row + top)
+    draw(c, ink, px + 2, py + 1 + row + top)
+  }
+  // The thumb is one pixel of Clawd's own colour.
+  if (thumb !== null) draw(c, { width: 1, height: 1, pixels: [frame('clawd_arm').pixels[0] ?? null] }, px + 2, py + 1 + thumb + top)
+  draw(c, frame('bubble'), scene.bubble[0], scene.bubble[1] + top)
+  if (action.dish) draw(c, frame(`dish_${action.dish}` as FrameName), scene.bubble[0] + 1, scene.bubble[1] + 1 + top)
+}
+
 export const renderScene = (name: SceneName, pose: Pose, action: Action = NONE, t = 0): Canvas => {
   const scene = DATA.scenes[name]
   const top = FX_ROWS * 2
@@ -66,6 +87,9 @@ export const renderScene = (name: SceneName, pose: Pose, action: Action = NONE, 
     draw(c, frame(flame), scene.flame[0], scene.flame[1] + top)
   }
   draw(c, frame('pan'), scene.pan[0], scene.pan[1] + action.panDy + top)
+  const lid = frame('pot_lid')
+  draw(c, frame('pot_body'), scene.pot[0], scene.pot[1] + lid.height + top)
+  draw(c, lid, scene.pot[0], scene.pot[1] + action.lidDy + top)
   drawBack(c, scene.table, action, top)
   drawClawd(c, scene.clawd[0], scene.clawd[1] + top, pose)
   drawFront(c, scene.table, action, top)
@@ -73,8 +97,7 @@ export const renderScene = (name: SceneName, pose: Pose, action: Action = NONE, 
     const y = bit.y + top
     if (bit.x >= 0 && bit.x < c.width && y >= 0 && y < c.height) c.px[y * c.width + bit.x] = bit.color
   }
-  const dot = frame('bubble_dot')
-  for (let i = 0; i < action.bubble; i++) draw(c, dot, scene.bubble[0] + i * (dot.width + 1), scene.bubble[1] + top)
+  if (action.phone) drawPhone(c, scene, action, top)
   return c
 }
 
@@ -92,8 +115,9 @@ export const sceneCells = (
   if (withSteam) {
     // A steam source names the empty pixel above a pot or pan; it rises from that pixel's lower dots.
     fx.push(
+      // The first source is the pot's; simmering adds particles to it.
       ...scene.steam.flatMap(([x, y, count], i) =>
-        steam(t + i * 911, { x: x * 2, y: (y + FX_ROWS * 2) * 2 + 1 }, { ...STEAM, count }),
+        steam(t + i * 911, { x: x * 2, y: (y + FX_ROWS * 2) * 2 + 1 }, { ...STEAM, count: count + (i === 0 ? action.potSteam : 0) }),
       ),
     )
   }

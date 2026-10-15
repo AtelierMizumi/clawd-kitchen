@@ -2,12 +2,14 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { DATA } from './gen/data'
-import { BUBBLE_STEP_MS, CHOP_MS, CUTS_PER_ITEM, NONE, PULL_STEP_MS, STIR_MS, actionAt } from './lib/actions'
+import { CHOP_MS, CUTS_PER_ITEM, DISHES, LID_STEP_MS, NONE, PULL_STEP_MS, SIMMER_STEAM, STIR_MS, SWIPE_MS, actionAt } from './lib/actions'
 import type { Kitchen } from './lib/actions'
 import { idlePose } from './lib/clawd'
 
 const comfy = DATA.scenes.comfy
 const { rest, work, foodY, knifeX, pileX } = comfy.table
+const [panX, panY] = comfy.pan
+const [potX0, potY0] = comfy.pot
 const clawdY = comfy.clawd[1]
 const away = (x: number): Kitchen => ({ tableX: x, sinceArrived: 0 })
 const atTable = (sinceArrived: number): Kitchen => ({ tableX: work, sinceArrived })
@@ -55,17 +57,25 @@ describe('typing: chopping at the table', () => {
   test('Clawd watches his work, holding the knife just beside the food', () => {
     const { pose, action } = at(0)
     expect(pose.eyes).toBe('down')
-    expect(action.knife).toEqual({ x: work + knifeX, hy: 1 })
+    expect(action.knife).toEqual({ x: work + knifeX, hy: foodY - 3 })
     expect(action.tableX).toBe(work)
   })
 
   test('the knife goes up, down and up again each chop, and the hand follows it', () => {
     const hy = [0, 0.3, 0.6, 0.8].map(p => cycle(0, p).action.knife!.hy)
-    expect(hy).toEqual([1, 3, 5, 3])
+    expect(hy).toEqual([foodY - 3, foodY - 1, foodY + 1, foodY - 1])
     for (const p of [0, 0.3, 0.6, 0.8]) {
       const { pose, action } = cycle(0, p)
       expect(pose.reach).toBe(action.knife!.hy - clawdY)
     }
+  })
+
+  test('the blade clears the food when raised and reaches the board when down', () => {
+    const blade = DATA.frames.knife_v.height - 1
+    const raised = cycle(0, 0).action.knife!.hy
+    const down = cycle(0, 0.6).action.knife!.hy
+    expect(raised + blade).toBeLessThan(foodY)
+    expect(down + blade).toBe(foodY + 3) // the food's last row, on the board
   })
 
   test('four cuts of two columns per ingredient: meat, then cucumber, then carrot, then meat again', () => {
@@ -114,16 +124,130 @@ describe('typing: chopping at the table', () => {
   })
 })
 
-describe('thinking', () => {
-  test('Clawd looks up with the arms raised', () => {
-    const { pose } = actionAt('thinking', 0)
-    expect(pose.eyes).toBe('up')
-    expect(pose.arms).toBe('up')
+describe('thinking: scrolling the phone', () => {
+  const at = (cycle: number, phase: number) => actionAt('thinking', Math.floor((cycle + phase) * SWIPE_MS))
+
+  test('Clawd looks at the phone in his raised left hand', () => {
+    const { pose } = at(0, 0.5)
+    expect(pose.eyes).toBe('left')
+    expect(pose.phone).toBe(true)
+    expect(pose.reach).toBeUndefined()
   })
 
-  test('a thought bubble fills one dot at a time and then empties', () => {
-    const dots = [0, 1, 2, 3, 4].map(i => actionAt('thinking', i * BUBBLE_STEP_MS).action.bubble)
-    expect(dots).toEqual([1, 2, 3, 0, 1])
+  test('the phone is out the whole time Clawd thinks, and only then', () => {
+    for (const p of [0, 0.1, 0.5, 0.95]) expect(at(0, p).action.phone).not.toBeNull()
+    for (const mood of ['idle', 'typing', 'stir', 'serve'] as const) expect(actionAt(mood, 500).action.phone).toBeNull()
+    expect(NONE.phone).toBeNull()
+    expect(NONE.dish).toBeNull()
+  })
+
+  test('each swipe takes the first fifth: the thumb flicks up the screen in four steps', () => {
+    const thumbs = [0.025, 0.075, 0.125, 0.175].map(p => at(0, p).action.phone!.thumb)
+    expect(thumbs).toEqual([3, 2, 1, 0])
+  })
+
+  test('the screen scrolls with the thumb, then holds still', () => {
+    const scrolls = [0.025, 0.075, 0.125, 0.175].map(p => at(0, p).action.phone!.scroll)
+    expect(scrolls).toEqual([0, 1, 2, 3])
+    expect(at(0, 0.5).action.phone!.scroll).toBe(0)
+  })
+
+  test('the bubble is empty while swiping, and the new dish pops in the moment the swipe ends', () => {
+    for (const p of [0, 0.1, 0.19]) expect(at(0, p).action.dish).toBeNull()
+    expect(at(0, 0.2).action.dish).toBe(DISHES[0])
+    expect(at(0, 0.9).action.dish).toBe(DISHES[0])
+  })
+
+  test('after the swipe the thumb lifts away', () => {
+    for (const p of [0.2, 0.5, 0.9]) expect(at(0, p).action.phone!.thumb).toBeNull()
+  })
+
+  test('a new dish every swipe, in order, around again', () => {
+    expect(DISHES).toEqual(['burger', 'egg', 'ramen'])
+    const seen = [0, 1, 2, 3, 4].map(c => at(c, 0.5).action.dish)
+    expect(seen).toEqual(['burger', 'egg', 'ramen', 'burger', 'egg'])
+  })
+
+  test('the table stays where it is while Clawd thinks', () => {
+    expect(actionAt('thinking', 0, away(-4)).action.tableX).toBe(-4)
+  })
+})
+
+describe('thinking: tossing in an ingredient', () => {
+  const at = (cycle: number, phase: number) => actionAt('thinking', Math.floor((cycle + phase) * SWIPE_MS))
+  const [clawdX, clawdY] = comfy.clawd
+  const hand = [clawdX + 13, clawdY + 1]
+  // Where each dish goes, and the colour of what goes in (read off the dish picture).
+  const dest = { burger: [panX + 7, panY], egg: [panX + 7, panY], ramen: [potX0 + 3, potY0] } as const
+  const colour = {
+    burger: DATA.frames.dish_burger.pixels[4 * 7 + 3],
+    egg: DATA.frames.dish_egg.pixels[2 * 7 + 2],
+    ramen: DATA.frames.dish_ramen.pixels[1 * 7 + 2],
+  } as const
+  const flight = (cycle: number) => [0.5, 0.56, 0.62, 0.68, 0.74, 0.79].map(p => at(cycle, p).action.bits)
+
+  test('the right arm goes up to throw for the middle of the cycle, and not otherwise', () => {
+    expect([0.45, 0.5, 0.79, 0.8, 0.9].map(p => at(0, p).pose.toss === true)).toEqual([false, true, true, false, false])
+  })
+
+  test('one piece of food flies, in the colour of the dish', () => {
+    for (const cycle of [0, 1, 2]) {
+      const dish = DISHES[cycle]!
+      for (const bits of flight(cycle)) {
+        expect(bits).toHaveLength(1)
+        expect(bits[0]!.color).toBe(colour[dish])
+      }
+    }
+  })
+
+  test('it leaves the right hand and lands in the pan for burger and egg, in the pot for ramen', () => {
+    for (const cycle of [0, 1, 2]) {
+      const dish = DISHES[cycle]!
+      const bits = flight(cycle).map(b => b[0]!)
+      expect(Math.abs(bits[0]!.x - hand[0]!)).toBeLessThanOrEqual(1)
+      expect(Math.abs(bits[0]!.y - hand[1]!)).toBeLessThanOrEqual(1)
+      const last = bits[bits.length - 1]!
+      expect(Math.abs(last.x - dest[dish][0])).toBeLessThanOrEqual(1)
+      expect(Math.abs(last.y - dest[dish][1])).toBeLessThanOrEqual(1)
+    }
+  })
+
+  test('it flies in an arc, higher than both the hand and the target', () => {
+    for (const cycle of [0, 2]) {
+      const dish = DISHES[cycle]!
+      const ys = flight(cycle).map(b => b[0]!.y)
+      expect(Math.min(...ys)).toBeLessThan(Math.min(hand[1]!, dest[dish][1]))
+    }
+  })
+
+  test('landing in the pan splashes three drops of it', () => {
+    const bits = at(0, 0.85).action.bits
+    expect(bits).toHaveLength(3)
+    for (const b of bits) {
+      expect(b.color).toBe(colour.burger)
+      expect(Math.abs(b.x - dest.burger[0])).toBeLessThanOrEqual(1)
+      expect(b.y).toBeLessThan(dest.burger[1])
+    }
+    expect(at(0, 0.85).action.lidDy).toBe(0)
+  })
+
+  test('landing in the pot pops its lid and puffs steam out beside it', () => {
+    const { action } = at(2, 0.85)
+    expect(action.lidDy).toBe(-1)
+    expect(action.bits).toHaveLength(2)
+  })
+
+  test('before the throw and after the splash nothing flies and the lid is shut', () => {
+    for (const p of [0.3, 0.45, 0.95]) {
+      const { action } = at(0, p)
+      expect(action.bits).toEqual([])
+      expect(action.lidDy).toBe(0)
+    }
+  })
+
+  test('the phone stays in the other hand through the throw', () => {
+    expect(at(0, 0.6).action.phone).not.toBeNull()
+    expect(at(0, 0.6).pose.phone).toBe(true)
   })
 })
 
@@ -169,6 +293,44 @@ describe('stir', () => {
       expect(pose.eyes).toBe('right')
       expect(pose.arms).toBe(action.panDy < 0 ? 'up' : 'rest')
     }
+  })
+})
+
+describe('simmer: the pot', () => {
+  const [potX, potY] = comfy.pot
+  const potW = DATA.frames.pot_lid.width
+  const at = (i: number) => actionAt('simmer', i * LID_STEP_MS)
+
+  test('Clawd watches the pot, on his right', () => {
+    const { pose } = at(0)
+    expect(pose.eyes).toBe('right')
+    expect(pose.phone).toBeUndefined()
+    expect(pose.reach).toBeUndefined()
+  })
+
+  test('the lid rattles: one pixel up, down again, every LID_STEP_MS', () => {
+    expect([0, 1, 2, 3].map(i => at(i).action.lidDy)).toEqual([0, -1, 0, -1])
+  })
+
+  test('the pot steams harder than usual, and no other mood does', () => {
+    expect(SIMMER_STEAM).toBeGreaterThan(0)
+    expect(at(0).action.potSteam).toBe(SIMMER_STEAM)
+    for (const mood of ['idle', 'typing', 'thinking', 'stir', 'serve'] as const) expect(actionAt(mood, 500).action.potSteam).toBe(0)
+    expect(NONE.potSteam).toBe(0)
+    expect(NONE.lidDy).toBe(0)
+  })
+
+  test('steam squeezes out on both sides of the lid whenever it is up, and only then', () => {
+    const up = at(1).action.bits
+    expect(up).toHaveLength(2)
+    expect(up.map(b => b.x).sort((a, b) => a - b)).toEqual([potX - 1, potX + potW])
+    expect(new Set(up.map(b => b.y)).size).toBe(1)
+    expect(up[0]!.y).toBeLessThanOrEqual(potY)
+    expect(at(0).action.bits).toEqual([])
+  })
+
+  test('the table stays where it is', () => {
+    expect(actionAt('simmer', 0, away(-6)).action.tableX).toBe(-6)
   })
 })
 
