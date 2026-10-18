@@ -1,126 +1,40 @@
-// Live Terminal Preview for Revamped Clawd Kitchen Animations
-// Run in terminal: pnpm dlx tsx tools/live_preview.ts [idle|stir|demo]
+// Plays one mood in this terminal at the mod's own tick rate, for a feel check.
+// usage: pnpm dlx tsx@4.19.2 tools/live_preview.ts [mood=idle] [seconds=10]
+import { DATA } from '../hooks/gen/data.ts'
+import type { Mood } from '../hooks/lib/mood.ts'
+import { PLAYBACK_STEP_MS, playback } from '../hooks/lib/playback.ts'
+import { CELL_W, DEFAULT } from '../hooks/lib/raster.ts'
+import { sceneCells } from '../hooks/lib/scene.ts'
 
-import { drawHighResClawd, highResIdlePose, highResStirPose } from '../hooks/lib/clawd_v2'
-import { QUAD_GLYPHS, createSubCanvas, toQuadrantCells } from '../hooks/lib/quadrant'
+const [, , mood = 'idle', seconds = '10'] = process.argv
+const columns = DATA.scenes.comfy.width / CELL_W
 
-const CW_CELLS = 26
-const CH_CELLS = 10
-const TICK_MS = 60
+const colour = (code: number, c: number) => `\x1b[${code};2;${(c >> 16) & 0xff};${(c >> 8) & 0xff};${c & 0xff}m`
 
-const mode = process.argv[2] ?? 'demo'
-
-// ANSI truecolor helper
-const toAnsi = (cells: Uint32Array, cols: number, rows: number): string => {
+const toAnsi = (cells: Uint32Array): string => {
   let out = ''
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const idx = (r * cols + c) * 3
-      const cp = cells[idx]!
-      const fg = cells[idx + 1]!
-      const bg = cells[idx + 2]!
-
-      const ch = String.fromCharCode(cp)
-      const fgR = (fg >> 16) & 0xff
-      const fgG = (fg >> 8) & 0xff
-      const fgB = fg & 0xff
-
-      let style = ''
-      if (fg !== 0x01000000) {
-        style += `\x1b[38;2;${fgR};${fgG};${fgB}m`
-      }
-      if (bg !== 0x01000000) {
-        const bgR = (bg >> 16) & 0xff
-        const bgG = (bg >> 8) & 0xff
-        const bgB = bg & 0xff
-        style += `\x1b[48;2;${bgR};${bgG};${bgB}m`
-      }
-      out += `${style}${ch}\x1b[0m`
-    }
-    out += '\r\n'
+  for (let i = 0; i < cells.length; i += 3) {
+    if (i > 0 && (i / 3) % columns === 0) out += '\n'
+    const [cp, fg, bg] = [cells[i]!, cells[i + 1]!, cells[i + 2]!]
+    out += (fg === DEFAULT ? '' : colour(38, fg)) + (bg === DEFAULT ? '' : colour(48, bg)) + String.fromCodePoint(cp) + '\x1b[0m'
   }
   return out
 }
 
-const renderScene = (t: number, currentMode: string): string => {
-  const canvas = createSubCanvas(CW_CELLS, CH_CELLS)
-
-  if (currentMode === 'stir') {
-    const { pose, panDy, flame } = highResStirPose(t)
-    drawHighResClawd(canvas, 4, 6, pose, true)
-
-    // Draw Pan
-    const px = 28
-    const py = 12 + panDy * 2
-    const PAN = 0x60646c
-    for (let x = 0; x < 14; x++) {
-      canvas.px[py * canvas.width + (px + x)] = PAN
-      canvas.px[(py + 1) * canvas.width + (px + x)] = PAN
-    }
-    // Pan handle
-    for (let x = -4; x < 0; x++) {
-      canvas.px[py * canvas.width + (px + x)] = PAN
-    }
-    // Flying food
-    if (panDy < 0) {
-      const u = ((t % 1200) - 200) / 700
-      if (u >= 0 && u <= 1) {
-        const fy = Math.round(py - Math.sin(u * Math.PI) * 8)
-        canvas.px[fy * canvas.width + (px + 4)] = 0xe2493b // tomato
-        canvas.px[(fy - 1) * canvas.width + (px + 7)] = 0xffe27a // egg
-        canvas.px[fy * canvas.width + (px + 10)] = 0x7cc456 // cucumber
-      }
-    }
-    // Stove flames
-    if (flame) {
-      const FLAME = (t % 160 < 80) ? 0xff7b22 : 0xffaa33
-      for (let x = 2; x < 12; x += 2) {
-        canvas.px[(py + 3) * canvas.width + (px + x)] = FLAME
-      }
-    }
-  } else {
-    // Idle mode
-    const pose = highResIdlePose(t)
-    drawHighResClawd(canvas, 8, 6, pose, true)
-  }
-
-  const cells = toQuadrantCells(canvas)
-  return toAnsi(cells, CW_CELLS, CH_CELLS)
-}
-
-const run = () => {
-  // Hide cursor, clear screen
-  process.stdout.write('\x1b[?25l\x1b[2J')
-
-  let t = 0
-  const timer = setInterval(() => {
-    t += TICK_MS
-    let activeMode = mode
-    if (mode === 'demo') {
-      const cycle = Math.floor(t / 4000) % 2
-      activeMode = cycle === 0 ? 'idle' : 'stir'
-    }
-
-    const header =
-      `\x1b[H\x1b[1;36m=== CLAWD-KITCHEN REVAMP TEST (Branch: feat/revamp-animation) ===\x1b[0m\r\n` +
-      `\x1b[33mMode:\x1b[0m ${activeMode.toUpperCase()} | \x1b[33mResolution:\x1b[0m Quadrants (2x horizontal detail) | \x1b[33mPress Ctrl+C to exit\x1b[0m\r\n\r\n`
-
-    const rendered = renderScene(t, activeMode)
-    const footer =
-      `\r\n\x1b[90mFeatures active: Sub-pixel eye slits, Bezier easing, Anticipation crouch, Hat inertia lag\x1b[0m\r\n`
-
-    process.stdout.write(header + rendered + footer)
-  }, TICK_MS)
-
-  const cleanup = () => {
-    clearInterval(timer)
-    // Show cursor, reset styling
-    process.stdout.write('\x1b[?25h\x1b[0m\n')
+const frames = [...playback(mood as Mood, Number(seconds) * 1000)]
+const rows = sceneCells('comfy', frames[0]!.pose, 0).length / 3 / columns
+process.stdout.write('\x1b[?25l')
+process.on('SIGINT', () => {
+  process.stdout.write('\x1b[?25h\n')
+  process.exit(0)
+})
+let i = 0
+setInterval(() => {
+  const { t, pose, action } = frames[i % frames.length]!
+  process.stdout.write(`${i === 0 ? '' : `\x1b[${rows}A`}${toAnsi(sceneCells('comfy', pose, t, { action }))}\n`)
+  i += 1
+  if (i === frames.length) {
+    process.stdout.write('\x1b[?25h')
     process.exit(0)
   }
-
-  process.on('SIGINT', cleanup)
-  process.on('SIGTERM', cleanup)
-}
-
-run()
+}, PLAYBACK_STEP_MS)

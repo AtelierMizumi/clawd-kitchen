@@ -1,221 +1,210 @@
-# Kitchen props, comfy size (12px tall scene, floor at y=11).
+# Kitchen props, drawn on the cell grid: one pixel is half a cell across and a half cell down, and no 2x2 cell
+# may hold more than two colours (transparent counts). The scene is 104x16 pixels, 52 cells by 8 rows, with the
+# floor on its last pixel row. Positions that stay put are even in x and y, so every sprite sits on cell boundaries.
 
+# A thin shadow line for the floor under everything, drawn first.
+@frame floor
+DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+
+# The stove: a light top, two burner plates, a panel with two knobs and an oven window, a deep base.
 @frame stove
-WWWWWWWWWWWWWWWWW
-wDWDDDDDDDDDDDWDw
-wdddddddddddddddw
-wdDDDDDDDDDDDDDdw
-wdddddddddddddddw
+WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+wwwwDDDDDDDDDDDDwwDDDDDDDDDDDDwwww
+ddWWddddDDDDDDDDDDDDDDDDDDddddWWdd
+ddWWddddDDDDDDDDDDDDDDDDDDddddWWdd
+DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
 
+# The pan: a wooden handle on the left, a rim, the side and a rounded bottom. Its body is the 14 pixels over the flame.
 @frame pan
-....dWWWWWd
-bbbbDdddddD
-.....DDDDD.
+........dWWWWWWWWWWWWd
+bbbbbbbbdddddddddddddd
+........dddddddddddddd
+..........DDDDDDDDDD..
 
 # The pot is two parts so its lid can rattle.
 @frame pot_lid
-...d...
-.PPPPP.
+......dd......
+..PPPPPPPPPP..
 
 @frame pot_body
-dpppppd
-.ppppp.
-.PPPPP.
+ddppppppppppdd
+..pppppppppp..
+..pppppppppp..
+..PPPPPPPPPP..
 
-@frame rail
-wwwwwwwwwwwww
+# The knife lying on the table: handle then blade, one row.
+@frame knife
+bbbbWWWWWW
 
-@frame ladle
-w.
-w.
+# The held knife: handle, then the blade down to its tip.
+@frame knife_v
+bb
+bb
+WW
+WW
 ww
 
-@frame spatula
-b
-b
-W
-W
-
-@frame whisk
-w.
-W.
-WW
-
-@frame knife
-bbWWW
-
+# Two flame frames under the pan.
 @frame flame_a
-.r.r.r.
-rfrfrfr
+..rr..rr..rr..
+ffffffffffffff
 
 @frame flame_b
-r.r.r.r
-frfrfrf
+rr..rr..rr..rr
+ffffffffffffff
 
 @frame shelf
-bbbbbbbbbb
+tttttttttttttttttttttttt
+bbbbbbbbbbbbbbbbbbbbbbbb
 
+# Three jars on the shelf: tomato, corn, leaf.
 @frame jars
-.cc..mm..yy
-.pp.mmmm.ff
-.pp.mmmm.ff
+........................
+...dddd....dddd....dddd.
+..mmmmmm..yyyyyy..gggggg
+..mmmmmm..yyyyyy..gggggg
 
-
-# The prep table is two layers. The back (a dark backsplash behind the food, so the
-# food stays readable over the stove) is drawn before Clawd; the front (the table
-# top and its side) is drawn after him, so it hides his legs: it is in front of him.
+# The prep table is two layers. The back (a dark backsplash behind the food, so the food stays readable over
+# the stove) is drawn before Clawd; the front (the table top and its side) is drawn after him, so it hides his legs.
 @frame prep_back
-ddddddddddd
-DDDDDDDDDDD
-DDDDDDDDDDD
-DDDDDDDDDDD
+dddddddddddddddddddddd
+DDDDDDDDDDDDDDDDDDDDDD
+DDDDDDDDDDDDDDDDDDDDDD
+DDDDDDDDDDDDDDDDDDDDDD
 
 @frame prep_front
-TTTTTTTTTTTTTTTTTTTTTTTT
-tbbbbbbbbbbbbbbbbbbbbbbt
+TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+ttbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbtt
 
-# The held knife: handle, then two rows of blade. (The lying one is 'knife'.)
-@frame knife_v
-b
-W
-w
-
-# Ingredients, 8 wide and 4 tall with a dark outline. Each comes with the flat cut
-# face the knife leaves (1 wide) and a slice (2 wide) for the pile.
+# Each comes with the flat cut face the knife leaves (2 wide) and a slice (4 wide) for the pile.
 @frame meat
-.NNNNNN.
-NnnFFxnN
-NnxnnMMN
-.NNNNNN.
+..NNNNNNNNNNNN..
+NNnnFFFFxxnnnnNN
+NNnnxxnnnnMMMMNN
+..NNNNNNNNNNNN..
 
 @frame meat_cut
-N
-F
-x
-N
+NN
+FF
+xx
+NN
 
 @frame meat_slice
-NN
-Fx
-xn
-NN
+NNNN
+FFxx
+nnMM
+NNNN
 
 @frame cucumber
-.LLLLLL.
-LlIgggGL
-LgggGGGL
-.LLLLLL.
+..LLLLLLLLLLLL..
+LLllIIIIggggggLL
+LLllggllggGGGGLL
+..LLLLLLLLLLLL..
 
 @frame cucumber_cut
-L
-I
-l
-L
+LL
+II
+ll
+LL
 
 @frame cucumber_slice
-LL
-Il
-lG
-LL
+LLLL
+IIll
+llGG
+LLLL
 
 @frame carrot
-.EEEEEE.
-EaauaaAE
-EAaaAAAE
-.EEEEEE.
+..EEEEEEEEEEEE..
+EEaauuuuaaaaaaEE
+EEaaAAaaaaAAAAEE
+..EEEEEEEEEEEE..
 
 @frame carrot_cut
-E
-u
-a
-E
+EE
+uu
+aa
+EE
 
 @frame carrot_slice
-EE
-ua
-aA
-EE
+EEEE
+uuaa
+aaAA
+EEEE
 
-# The phone Clawd scrolls with his left hand, 4 wide; the screen is the 2x4 inside.
+# Clawd's phone, 6 wide. The screen's rows alternate between two inks; scrolling swaps which is which.
 @frame phone
-dddd
-dvvd
-dvvd
-dvvd
-dvvd
-dddd
+dddddd
+dvvvvd
+dVVVVd
+dvvvvd
+dVVVVd
+dddddd
 
-# Two inks the screen's rows alternate between as it scrolls.
 @frame phone_ink_a
 v
 
 @frame phone_ink_b
 V
 
-# A white thought bubble above the phone: a 9x8 body (its 7x6 inside holds the dish)
-# and a two-row tail whose point reaches down to the phone.
+# A white thought bubble above the phone with a two-row tail whose point reaches down to the phone.
 @frame bubble
-.CCCCCCC.
-CZZZZZZZC
-CZZZZZZZC
-CZZZZZZZC
-CZZZZZZZC
-CZZZZZZZC
-CZZZZZZZC
-.CCCCCCC.
-...CZC...
-....C....
+CCCCCCCCCCCCCCCCCC
+CZZZZZZZZZZZZZZZZC
+CZZZZZZZZZZZZZZZZC
+CZZZZZZZZZZZZZZZZC
+CZZZZZZZZZZZZZZZZC
+CZZZZZZZZZZZZZZZZC
+CZZZZZZZZZZZZZZZZC
+CCCCCCCCCCCCCCCCCC
+........CZZC......
+.........CC.......
 
+# The dishes are 14 wide and 4 tall, every cell with one colour or two opaque ones.
 @frame dish_burger
-.TTTTT.
-TTTTTTT
-ggggggg
-uuuuuuu
-bbbbbbb
-.TTTTT.
+....TTTTTT....
+..TTTTTTTTTT..
+ggbbbbuubbbbgg
+TTTTTTTTTTTTTT
 
-# The egg has an outline: its white is nearly the bubble's white.
 @frame dish_egg
-..CCC..
-.CcccC.
-CcYYccC
-CcYYccC
-.CcccC.
-..CCC..
+....CCCCCC....
+..CCccccccCC..
+..ccYYYYcccc..
+..CCCCCCCCCC..
 
 @frame dish_ramen
-..Y.n..
-.aaaaa.
-.aaaaa.
-ppppppp
-.ppppp.
-..PPP..
+....nnggYY....
+..aaaaaaaaaa..
+pppppppppppppp
+..PPPPPPPPPP..
 
 # A salt shaker: a steel cap on a glass body.
 @frame shaker
-www
-ccc
-CCC
+wwww
+wwww
+cccc
+CCCC
 
-# A plate for the finished dish, one row, sitting on the table.
+# A plate for the finished dish, sitting on the table.
 @frame plate
-CcccccccC
+CCccccccccccccccCC
+..CCCCCCCCCCCCCC..
 
-# What is left in the pan after an error: a black lump with a glowing ember.
+# What is left in the pan after an error: a black lump heaped above the pan's rim, with a glowing ember.
 @frame burnt
-.DDDD.
-DDrDDD
+..DDDDDDDD..
+DDDDDDrrDDDD
 
 # A sleeping Clawd's z, two sizes.
 @frame zee_small
-ZZZ
-..Z
-.Z.
-ZZZ
+ZZZZZZ
+....ZZ
+..ZZ..
+ZZZZZZ
 
 @frame zee_big
-ZZZZ
-...Z
-..Z.
-.Z..
-ZZZZ
+ZZZZZZZZ
+......ZZ
+....ZZ..
+..ZZ....
+ZZZZZZZZ

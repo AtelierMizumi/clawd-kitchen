@@ -62,9 +62,10 @@ claude plugin uninstall clawd-kitchen
 
 ## Fonts
 
-Each terminal cell shows two square pixels with the half-block characters
-`▀` `▄`, and effects use braille characters (U+2800–U+28FF). Almost every
-monospace font has the half blocks. Braille is where fonts differ:
+Each terminal cell shows a 2×2 block of pixels with the quadrant characters
+`▘▝▖▗▀▄▌▐▚▞▛▜▙▟█` (U+2596–U+259F and the half blocks), and effects use braille
+characters (U+2800–U+28FF). Almost every monospace font has the block
+elements. Braille is where fonts differ:
 
 - **Good:** the font draws only the raised dots. Adwaita Mono, DejaVu Sans
   Mono, any Nerd Font (for example AtkynsonMono Nerd Font), Iosevka, JetBrains
@@ -118,15 +119,15 @@ Nothing to do: Clawd, in a chef hat, appears above the prompt when a session sta
 
 | What Clawd does | When |
 |---|---|
-| Breathes (the top of the body glows, arms lift on the inhale), blinks, glances at the pan, taps a foot | Idle |
-| Pulls the prep table over from the left, then chops meat, cucumber and carrot; each slice hops onto a fanned pile | You are typing in the prompt |
-| Scrolls through dishes on a phone in his left hand, with a bubble above it showing the dish; then tosses its ingredient into the pan (burger, egg) or the pot (ramen) with his right hand | Claude is thinking |
-| Watches the pot, its lid rattling with steam squeezing out | The answer is streaming in |
-| Tosses the pan over the flames | Claude runs a Bash command |
-| Shakes salt into the pan | Claude edits or writes a file |
-| Pulls the table over and cheers while the dish drops onto a plate and sparkles twinkle | An answer is served |
-| Coughs and fans dark smoke away from a burnt pan | Claude errors or refuses |
-| Dozes with slow breaths while z's float up | Quiet for five minutes |
+| Breathes (the top of the body glows, arms lift on the inhale, a settle on the exhale with the hat a beat late), blinks (sometimes twice), and now and then glances at the pan and pot, taps a foot, stretches, adjusts his hat or hops | Idle |
+| Leans away and tugs the prep table over from the left, then chops meat, cucumber and carrot: the body stretches with the knife, crouches as it cuts, and each slice flies an arc onto a fanned pile | You are typing in the prompt |
+| Scrolls through dishes on a phone in his left hand, with a bubble above it showing the dish; then winds up and tosses its ingredient in an arc into the pan (burger, egg, with three splashing drops) or the pot (ramen, the lid popping twice) with his right hand | Claude is thinking |
+| Leans toward the pot and watches it, the lid rattling at uneven intervals with steam squeezing out and bubbles popping | The answer is streaming in |
+| Grips the pan's handle, crouches, and tosses it over the flames: three bits of food on different arcs, landing one after another | Claude runs a Bash command |
+| Holds a shaker high and shakes salt that falls into the pan, then nods | Claude edits or writes a file |
+| Pulls the table over, watches the dish drop and bounce twice on a plate, then cheers and hops while sparkles twinkle | An answer is served |
+| Is startled, coughs while fanning dark smoke away from a burnt pan, then droops | Claude errors or refuses |
+| Dozes with slow deep breaths, the hat slipping, while z's float up | Quiet for five minutes |
 
 ### Command
 
@@ -142,16 +143,26 @@ python3 tools/build.py          # sprites/*.txt + scenes.json → hooks/gen/data
 python3 -m pytest -q tests      # sprite format
 claude plugin test .            # hooks logic
 claude plugin validate .
-python3 tools/gif.py typing 5400 60     # preview/out/typing.gif: <mood> [ms] [step], rendered by the mod's own code
+python3 tools/gif.py typing 5400 80     # preview/out/typing.gif: <mood> [ms] [step], rendered by the mod's own code
+python3 tools/strip.py stir 1200 80     # preview/out/stir-strip.png: one picture per tick, to judge a motion
+pnpm dlx tsx@4.19.2 tools/live_preview.ts stir 10   # plays a mood in this terminal at the mod's own tick rate
 ```
 
 `tools/gif.py` runs `tools/frames.ts` through `pnpm dlx tsx` and draws the
 cells like a terminal does, so previews match what the mod shows.
 
+The scene is 104×16 pixels (52 cells by 8 rows). Claude Code accepts only
+code points in the Basic Multilingual Plane, so quadrants are the finest
+blocks available (sextants and octants would be refused). Art is drawn on the
+cell grid so that no cell needs a third colour; `hooks/art.test.ts` checks
+that, and that Clawd's eyes survive the encoding, in every mood.
+
 Sprites are plain text in `sprites/`: `palette.txt` maps one character to one
 colour, `.` is transparent, and `@frame <name>` starts each frame. Clawd is
 assembled from parts (`clawd_body`, `clawd_arm`, `clawd_leg`, `clawd_eye`) by
-`hooks/lib/clawd.ts`, so new poses need no new drawings.
+`hooks/lib/clawd.ts`, so new poses need no new drawings. Each mood's motion is
+a pure function of time in `hooks/lib/motion/`, built from held keyframes of
+whole 80 ms ticks; `hooks/lib/actions.ts` chooses between them.
 
 To work on it with hot reload, run `claude --plugin-dir .` from the repo.
 

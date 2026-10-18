@@ -1,32 +1,65 @@
-// Clawd, assembled from parts so one body can take many poses without
-// changing shape: a breath that lights the top row, arms that lift on the
-// inhale, eyes that blink and glance, and a foot that taps.
+// Clawd, assembled from parts so one body can take many poses without changing shape. Sizes are in
+// quadrant pixels: two to a cell across, two down. The art is drawn on the cell grid (see sprites/clawd.txt),
+// so poses move whole parts and keep every cell to two colours at most.
+//
+// Coordinates are relative to Clawd's origin: the left edge of his left arm, and the top row of his body.
 import { DATA } from '../gen/data'
 import type { Canvas, Color } from './raster'
 import { draw } from './raster'
 
-export type Eyes = 'open' | 'closed' | 'left' | 'right' | 'up' | 'down'
-export type Pose = { eyes: Eyes; arms: 'rest' | 'up'; legs: 'stand' | 'tap'; glow: number; reach?: number; phone?: boolean; toss?: boolean; shake?: boolean }
+export type Eyes = 'open' | 'half' | 'closed' | 'left' | 'right' | 'up' | 'down' | 'wide' | 'happy'
+/** An arm at rest, lifted a row, high with a forearm up, stretched out, or holding something at a hand row. */
+export type Arm = 'rest' | 'lift' | 'high' | 'out' | 'hold'
+export type Legs = 'stand' | 'tapL' | 'tapR' | 'step' | 'hop'
+export type Pose = {
+  eyes: Eyes
+  armL: Arm
+  armR: Arm
+  /** The hand's row when that arm is `hold`, relative to the top of the body. */
+  handL: number
+  handR: number
+  legs: Legs
+  /** Toward the table or the stove, one cell (two pixels) at a time; body, hat and arms move, legs stay. */
+  lean: -1 | 0 | 1
+  /** 1 crouches (body and hat a row lower, legs shorter), -1 stretches (a row higher, legs longer). */
+  squash: -1 | 0 | 1
+  /** The hat's own offset in rows, positive lower: it lags the head. */
+  hat: number
+  /** 0 to 1: how much the breath lights the body's top row. */
+  glow: number
+}
 
-export const CLAWD_WIDTH = 13
+export const poseOf = (p: Partial<Pose> = {}): Pose => ({
+  eyes: 'open',
+  armL: 'rest',
+  armR: 'rest',
+  handL: 2,
+  handR: 2,
+  legs: 'stand',
+  lean: 0,
+  squash: 0,
+  hat: 0,
+  glow: 0,
+  ...p,
+})
+
+const { clawd_body: body, clawd_arm: arm, clawd_leg: leg, clawd_eye: eye, chef_hat: hat } = DATA.frames
+
+export const CLAWD_WIDTH = 26
 export const CLAWD_HEIGHT = 7
 /** Rows the chef hat adds above the body. */
 export const HAT_HEIGHT = 4
 
-export const BREATH_MS = 3200
-export const BLINK_PERIOD_MS = 4700
-export const BLINK_MS = 140
-export const FIDGET_PERIOD_MS = 9000
-export const FIDGET_MS = 1400
-export const FIDGETS = ['look-left', 'look-right', 'tap', 'flutter'] as const
-
-const BODY_X = 2
+const ARM_W = arm.width
+const BODY_X = ARM_W
+const RIGHT_ARM_X = BODY_X + body.width
 const ARM_Y = 2
-const EYE_XS = [4, 8]
-const LEG_XS = [3, 5, 7, 9]
-const LEG_Y = 5
+const LEG_XS = [2, 6, 10, 14]
+const LEG_Y = body.height
+const FLOOR = CLAWD_HEIGHT - 1
+const EYE_XS = [4, 12]
+const LIFTED: Record<Legs, readonly number[]> = { stand: [], tapL: [0], tapR: [3], step: [0, 2], hop: [0, 1, 2, 3] }
 
-const { clawd_body: body, clawd_arm: arm, clawd_leg: leg, clawd_eye: eye, chef_hat: hat } = DATA.frames
 const LIGHT = body.pixels[0] as Color
 const BASE = body.pixels[body.width] as Color
 const SHADOW = body.pixels[body.pixels.length - 1] as Color
@@ -45,65 +78,82 @@ const mix = (a: Color, b: Color, t: number): Color => {
 const set = (c: Canvas, x: number, y: number, color: Color) => {
   if (x >= 0 && x < c.width && y >= 0 && y < c.height) c.px[y * c.width + x] = color
 }
+const rect = (c: Canvas, x: number, y: number, w: number, h: number, color: Color) => {
+  for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) set(c, x + dx, y + dy, color)
+}
 
-export const drawClawd = (c: Canvas, x: number, y: number, pose: Pose): void => {
-  draw(c, body, x + BODY_X, y)
-  draw(c, hat, x + BODY_X + (body.width - hat.width) / 2, y - HAT_HEIGHT)
-  const top = mix(BASE, LIGHT, pose.glow)
-  for (let i = 0; i < body.width; i++) set(c, x + BODY_X + i, y, top)
+/** The row an arm hangs from: a holding arm's shoulder lifts when the hand is high. */
+const shoulderRow = (arm: Arm, hand: number): number =>
+  arm === 'rest' || arm === 'out' ? ARM_Y : arm === 'lift' ? 1 : arm === 'high' ? 0 : hand <= -2 ? 0 : 1
 
-  // Reaching with a knife: the left arm is raised, with a forearm beside it and the
-  // hand one pixel further out; the right arm rests. The shoulder lifts with a high
-  // knife, so the forearm stays short (three pixels at the most).
-  const raised = pose.arms === 'up'
-  const holding = pose.reach !== undefined
-  const armRow = holding ? (pose.reach! <= -2 ? 0 : 1) : raised || pose.phone ? 1 : ARM_Y
-  const rightUp = pose.toss || (raised && !holding && !pose.phone)
-  const rightY = pose.shake ? y : y + ARM_Y - (rightUp ? 1 : 0)
-  draw(c, arm, x, y + armRow)
-  draw(c, arm, x + BODY_X + body.width, rightY)
-  if (holding) {
-    const lo = Math.min(pose.reach!, armRow)
-    const hi = Math.max(pose.reach!, armRow)
-    for (let dy = lo; dy <= hi; dy++) set(c, x - 1, y + dy, BASE)
-    set(c, x - 2, y + pose.reach!, BASE)
-  }
-
-  if (pose.shake) {
-    // The right forearm goes up beside the raised arm, and the hand holds the shaker.
-    const col = x + BODY_X + body.width + 2
-    for (let dy = -2; dy <= 0; dy++) set(c, col, y + dy, BASE)
-    set(c, col + 1, y - 2, BASE)
-  }
-
-  LEG_XS.forEach((lx, i) => {
-    const lifted = pose.legs === 'tap' && i === LEG_XS.length - 1
-    if (lifted) set(c, x + lx, y + LEG_Y, SHADOW)
-    else draw(c, leg, x + lx, y + LEG_Y)
-  })
-
-  const shift = pose.eyes === 'left' ? -1 : pose.eyes === 'right' ? 1 : 0
-  const lift = pose.eyes === 'up' ? -1 : pose.eyes === 'down' ? 1 : 0
-  for (const ex of EYE_XS) {
-    if (pose.eyes === 'closed') set(c, x + ex, y + 2, SHADOW)
-    else for (let dy = 1; dy <= 2; dy++) set(c, x + ex + shift, y + dy + lift, EYE)
+const drawArm = (c: Canvas, x: number, y: number, side: 'L' | 'R', kind: Arm, hand: number): void => {
+  const left = side === 'L'
+  const row = y + shoulderRow(kind, hand)
+  draw(c, arm, x + (left ? 0 : RIGHT_ARM_X), row)
+  const outer = left ? x : x + RIGHT_ARM_X + ARM_W - 2
+  const beyond = left ? x - 2 : x + RIGHT_ARM_X + ARM_W
+  if (kind === 'out') rect(c, beyond, row, 2, 1, BASE)
+  if (kind === 'high') rect(c, outer, row - 2, 2, 2, BASE)
+  if (kind === 'hold') {
+    const lo = Math.min(hand, shoulderRow(kind, hand))
+    const hi = Math.max(hand, shoulderRow(kind, hand))
+    rect(c, beyond, y + lo, 2, hi - lo + 1, BASE)
+    rect(c, left ? beyond - 2 : beyond + 2, y + hand, 2, 1, BASE)
   }
 }
 
-/** Clawd at rest, `t` ms into the idle loop. */
-export const idlePose = (t: number): Pose => {
-  const phase = (t % BREATH_MS) / BREATH_MS
-  const glow = (1 - Math.cos(2 * Math.PI * phase)) / 2
-  const pose: Pose = { eyes: 'open', arms: glow >= 0.5 ? 'up' : 'rest', legs: 'stand', glow }
+/** Where a held prop sits: the end of the arm, in the same coordinates as the pose is drawn in. */
+export const handAnchor = (pose: Pose, side: 'L' | 'R'): [number, number] => {
+  const left = side === 'L'
+  const kind = left ? pose.armL : pose.armR
+  const hand = left ? pose.handL : pose.handR
+  const shift = pose.lean * 2
+  const outerX = left ? 0 : RIGHT_ARM_X + ARM_W - 1
+  const [dx, dy] =
+    kind === 'out'
+      ? [left ? -2 : outerX + 2, ARM_Y]
+      : kind === 'high'
+        ? [outerX, -2]
+        : kind === 'hold'
+          ? [left ? -4 : outerX + 4, hand]
+          : [outerX, shoulderRow(kind, hand)]
+  return [dx + shift, dy + pose.squash]
+}
 
-  const within = t % FIDGET_PERIOD_MS
-  if (within < FIDGET_MS) {
-    const fidget = FIDGETS[Math.floor(t / FIDGET_PERIOD_MS) % FIDGETS.length]
-    if (fidget === 'look-left') pose.eyes = 'left'
-    else if (fidget === 'look-right') pose.eyes = 'right'
-    else if (fidget === 'tap') pose.legs = Math.floor(within / 175) % 2 === 0 ? 'tap' : 'stand'
-    else if (Math.floor(within / 140) % 4 === 1) pose.eyes = 'closed'
+export const drawClawd = (c: Canvas, x: number, y: number, pose: Pose): void => {
+  const by = y + pose.squash
+  const bx = x + pose.lean * 2
+  const floor = y + FLOOR
+
+  draw(c, body, bx + BODY_X, by)
+  for (let i = 0; i < body.width; i++) set(c, bx + BODY_X + i, by, mix(BASE, LIGHT, pose.glow))
+
+  // Eyes: the sprite's two-pixel block, shifted for a glance, shortened for a blink.
+  const shiftX = pose.eyes === 'left' ? -2 : pose.eyes === 'right' ? 2 : 0
+  const shiftY = pose.eyes === 'up' ? -1 : pose.eyes === 'down' ? 1 : 0
+  for (const ex of EYE_XS) {
+    const x0 = bx + BODY_X + ex
+    if (pose.eyes === 'closed') rect(c, x0 - 1, by + 2, 4, 1, SHADOW)
+    else if (pose.eyes === 'half') rect(c, x0, by + 2, 2, 1, EYE)
+    else if (pose.eyes === 'wide') rect(c, x0, by + 1, 2, 3, EYE)
+    else if (pose.eyes === 'happy') {
+      // The arch sits in the cell-aligned pair of rows inside the body, so a crouch or stretch moves it up a row.
+      const top = by + (pose.squash === 0 ? 2 : 1)
+      rect(c, x0 + 1, top, 2, 1, EYE)
+      set(c, x0, top + 1, EYE)
+      set(c, x0 + 3, top + 1, EYE)
+    } else draw(c, eye, x0 + shiftX, by + 1 + shiftY)
   }
-  if (t % BLINK_PERIOD_MS < BLINK_MS) pose.eyes = 'closed'
-  return pose
+
+  drawArm(c, bx, by, 'L', pose.armL, pose.handL)
+  drawArm(c, bx, by, 'R', pose.armR, pose.handR)
+  draw(c, hat, bx + BODY_X + (body.width - hat.width) / 2, by - HAT_HEIGHT + pose.hat)
+
+  // Legs run from the body's foot to the floor, so a crouch shortens them and a stretch lengthens them;
+  // a lifted leg stops a row short.
+  const top = by + LEG_Y
+  LEG_XS.forEach((lx, i) => {
+    const bottom = LIFTED[pose.legs].includes(i) ? floor - 1 : floor
+    for (let row = top; row <= bottom; row++) rect(c, x + BODY_X + lx, row, leg.width, 1, SHADOW)
+  })
 }
