@@ -1,0 +1,144 @@
+# Clawd v3 is Claude Code's own Clawd, on model, at twice its size: the model Claude Code draws in its header with
+# quadrant glyphs (a 13x4 body, one-pixel eye holes, 2x1 arms low on the sides, legs in two pairs), each model pixel
+# drawn here as 2x2 quadrant pixels. Only the chef hat is added. Squash and stretch are the animator's drawings of the
+# same body, kept to even heights so every edge stays on a cell boundary. Parts are placed by hooks/v3/clawd.ts.
+
+# Bodies: the model's 13x4 (26x8 here); squash a model pixel wider each side and one lower; stretch one higher at the
+# same width (narrower would leave the outer legs outside the body).
+@frame body
+@anchor neck 13 0
+@anchor eyeL 4 2
+@anchor eyeR 20 2
+@anchor shoulderL 0 4
+@anchor shoulderR 25 4
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+
+# A breath in: the head half a model pixel higher, same width; arms and eyes rise with it.
+@frame body_inhale
+@anchor neck 13 0
+@anchor eyeL 4 2
+@anchor eyeR 20 2
+@anchor shoulderL 0 4
+@anchor shoulderR 25 4
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+
+@frame body_squash
+@anchor neck 15 0
+@anchor eyeL 6 2
+@anchor eyeR 22 2
+@anchor shoulderL 0 2
+@anchor shoulderR 29 2
+oooooooooooooooooooooooooooooo
+oooooooooooooooooooooooooooooo
+oooooooooooooooooooooooooooooo
+oooooooooooooooooooooooooooooo
+oooooooooooooooooooooooooooooo
+oooooooooooooooooooooooooooooo
+
+@frame body_stretch
+@anchor neck 13 0
+@anchor eyeL 4 2
+@anchor eyeR 20 2
+@anchor shoulderL 0 6
+@anchor shoulderR 25 6
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+oooooooooooooooooooooooooo
+
+# Eyes are holes in the body. Each cel's `pupil` anchor is where an open eye's top left would be, so every cel sits
+# on the same spot. Closed is the model's lid: a quarter-cell line (one pixel here) two pixels wide, under the eye
+# and to its left, as on the original.
+@frame eye_open
+@anchor pupil 0 0
+kk
+kk
+
+@frame eye_half
+@anchor pupil 0 0
+oo
+kk
+
+@frame eye_closed
+@anchor pupil 2 0
+oooo
+kkkk
+
+@frame eye_happy
+@anchor pupil 1 0
+.kk.
+k..k
+
+# Arms: the model's `down` (2x1, low on the side) and `up` (raised on a slant), left and right.
+@frame arm_down_l
+@anchor shoulder 3 0
+oooo
+oooo
+
+@frame arm_down_r
+@anchor shoulder 0 0
+oooo
+oooo
+
+@frame arm_up_l
+@anchor shoulder 3 2
+oooo
+oooo
+..oo
+..oo
+
+@frame arm_up_r
+@anchor shoulder 0 2
+oooo
+oooo
+oo..
+oo..
+
+@frame leg
+oo
+oo
+
+# Chef hat: a puff on a band, nine model pixels wide, with pleats, a shaded underside and a bright top. Every part is
+# drawn to fill whole 2x2 cells with two tones at most, so the hat can float up by whole model pixels over the head.
+@frame hat
+@anchor base 9 7
+....HHHHHHHHHH....
+....WWWWWWWWWW....
+..WWWWVWWWWWVWWW..
+..WWWWVWWWWWVWWW..
+..WWWWVWWWWWVWWW..
+..VVVVVVVVVVVVVV..
+....gggggggggg....
+....GGGGGGGGGG....
+
+# The hat pressed down by the head (a squash): shorter and wider. It is drawn in place of the hat, never lower, so
+# it never sinks into the head.
+@frame hat_squash
+@anchor base 11 5
+....HHHHHHHHHHHHHH....
+....WWWWWWWWWWWWWW....
+..WWWWWWVWWWWWWVWWWW..
+..VVVVVVVVVVVVVVVVVV..
+....gggggggggggggg....
+....GGGGGGGGGGGGGG....

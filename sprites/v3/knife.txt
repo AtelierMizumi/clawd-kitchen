@@ -1,0 +1,130 @@
+# The left arm holding the knife, as the typing mood draws it. Each cel is authored in 2x2 blocks (`@scale 2`: one
+# character is a 2x2 pixel block, one terminal cell wide) over 11 columns and 9 rows, so the knife sits on the stage's
+# cell grid and the food under it. Block coordinates on the stage: the shoulder block is column 28, row 12 (the
+# body's left side); the knife is at column 23 (24 pulled back) and the food's top row is 11. The arm is one block
+# thick, as the model's stub is one model pixel; it is drawn as a path from the shoulder to the hand at the handle.
+
+# The blow lands: the blade is in the food.
+@frame knife_impact
+@scale 2
+@anchor shoulder 10 8
+...........
+...........
+...........
+...........
+...........
+...........
+.....hooo..
+.....S..oo.
+.....S...oo
+
+# Held ready, the blade just above the food.
+@frame knife_ready
+@scale 2
+@anchor shoulder 10 8
+...........
+...........
+...........
+...........
+.....hooo..
+.....S..oo.
+.....S...o.
+.........o.
+.........oo
+
+# Raising the knife, a block at a time.
+@frame knife_raise1
+@scale 2
+@anchor shoulder 10 8
+...........
+...........
+...........
+.....hooo..
+.....S..oo.
+.....S...o.
+.........o.
+.........o.
+.........oo
+
+@frame knife_raise2
+@scale 2
+@anchor shoulder 10 8
+...........
+...........
+.....hooo..
+.....S..oo.
+.....S...o.
+.........o.
+.........o.
+.........o.
+.........oo
+
+@frame knife_raise3
+@scale 2
+@anchor shoulder 10 8
+...........
+.....hooo..
+.....S..oo.
+.....S...o.
+.........o.
+.........o.
+.........o.
+.........o.
+.........oo
+
+# The top of the stroke: the knife pulled back a block.
+@frame knife_hang
+@scale 2
+@anchor shoulder 10 8
+......hoo..
+......S.oo.
+......S..o.
+.........o.
+.........o.
+.........o.
+.........o.
+.........o.
+.........oo
+
+# One frame mid-stroke: the blade stretched, streaks behind.
+@frame knife_smear
+@scale 2
+@anchor shoulder 10 8
+.....z.....
+.....z.....
+.....hooo..
+.....S..oo.
+.....S...o.
+.....S...o.
+.....S...o.
+.........o.
+.........oo
+
+
+# The flick after the blow: the blade thrown up and left, tossing the slice.
+@frame knife_pull
+@scale 2
+@anchor shoulder 10 8
+...........
+...........
+...........
+...........
+...........
+....S......
+.....S.....
+......hoo..
+........ooo
+
+# At rest the knife lies on the board beside the food, the hand on its handle: the model's stub arm.
+@frame knife_rest
+@scale 2
+@anchor shoulder 10 8
+...........
+...........
+...........
+...........
+...........
+...........
+...........
+...........
+......SShoo

@@ -1,0 +1,279 @@
+# The v3 kitchen, 160x32 quadrant pixels (80 columns, 16 rows). Everything here is drawn in 2x2 blocks (`@scale 2`: one
+# character is one terminal cell wide and one cell tall), so a cell holds one prop's colours and nothing else. `@shade`
+# lights the top edge of a prop's blocks and darkens the bottom edge, which gives each thing a bevel without ever
+# needing a third colour in a cell. Block coordinates on the stage: the floor is row 15; Clawd stands on it with his body
+# in columns 29..41; the table, in place at the board, spans columns 10..26 (top on row 13, legs on row 14) with the food
+# on it in rows 11..12; the shelf is at the top left (rows 0..3); the stove stands right next to his right arm (columns 44..60) with the pot on
+# its left burner, and the window is over it.
+
+# The wall: a deeper tone above, tiles below, each tile four cells wide and two tall, alternating in a quiet checker.
+@frame wall
+@scale 2
+11111111111111111111111111111111111111111111111111111111111111111111111111111111
+11111111111111111111111111111111111111111111111111111111111111111111111111111111
+11111111111111111111111111111111111111111111111111111111111111111111111111111111
+22223333222233332222333322223333222233332222333322223333222233332222333322223333
+22223333222233332222333322223333222233332222333322223333222233332222333322223333
+33332222333322223333222233332222333322223333222233332222333322223333222233332222
+33332222333322223333222233332222333322223333222233332222333322223333222233332222
+22223333222233332222333322223333222233332222333322223333222233332222333322223333
+22223333222233332222333322223333222233332222333322223333222233332222333322223333
+33332222333322223333222233332222333322223333222233332222333322223333222233332222
+33332222333322223333222233332222333322223333222233332222333322223333222233332222
+22223333222233332222333322223333222233332222333322223333222233332222333322223333
+22223333222233332222333322223333222233332222333322223333222233332222333322223333
+33332222333322223333222233332222333322223333222233332222333322223333222233332222
+33332222333322223333222233332222333322223333222233332222333322223333222233332222
+
+# The floor: boards five cells long, alternating a shade.
+@frame floor
+@scale 2
+@shade fF
+fffffFFFFFfffffFFFFFfffffFFFFFfffffFFFFFfffffFFFFFfffffFFFFFfffffFFFFFfffffFFFFF
+
+# A shadow on the floor under his feet, in three widths as he lifts off: pixels, two rows (the floor's own two tones, darker).
+@frame shadow_wide
+44444444444444444444444444
+55555555555555555555555555
+
+@frame shadow_mid
+444444444444444444
+555555555555555555
+
+@frame shadow_small
+4444444444
+5555555555
+
+# The prep table seen from the front: a plank top with a lighter board let into it (a few grain marks), two legs.
+@frame table
+@scale 2
+@shade pbBq
+pppbbbbBbbbBbbbpp
+.q.............q.
+
+# Food, eight blocks by two, set on the board. Ridges, a leaf, pale ends and fat tell them apart.
+@frame food_carrot
+@scale 2
+@shade clR
+lccRcc..
+ccRccRcc
+
+@frame food_cucumber
+@scale 2
+@shade uiU
+.uuUuu..
+iuUuuUui
+
+@frame food_meat
+@scale 2
+@shade mnM
+.mmMmm..
+mnmmmnMm
+
+# A slice, one block, in each food's colour.
+@frame slice_carrot
+@scale 2
+@shade c
+c
+
+@frame slice_cucumber
+@scale 2
+@shade u
+u
+
+@frame slice_meat
+@scale 2
+@shade m
+m
+
+# The spark where the blade lands: two blocks, white and yellow.
+@frame spark
+@scale 2
+.x
+w.
+
+# The wall shelf: a plank with three jars on it.
+@frame shelf
+@scale 2
+@shade rdyve
+.dd..dd..dd....
+.yy..vv..ee....
+.yy..vv..ee....
+rrrrrrrrrrrrrrr
+
+# The window over the stove: a frame with a cross, night sky and a moon.
+@frame window
+@scale 2
+@shade J
+JJJJJJJJJJJJ
+JKKKKJKKKQKJ
+JKKKKJKKKKKJ
+JJJJJJJJJJJJ
+JKKKKJKKKKKJ
+JKKKKJKKKKKJ
+JJJJJJJJJJJJ
+
+# The stove: a cooktop, a body with knobs and a handle, and the oven's dark glass.
+@frame stove
+@scale 2
+@shade sTNO
+TTTTTTTTTTTTTTTTT
+ssNssssNNNNNssNss
+sOOOOOOOOOOOOOOOs
+
+# The pot on the left burner. The body is two blocks (rim ears and all); the lid is two more on top, with a knob; the
+# soup is one block between them when the lid is off or lifted, a darker one when it has burnt.
+@frame pot_body
+@scale 2
+@shade Aa
+AaaaaaaA
+aaaaaaaa
+
+@frame pot_lid
+@scale 2
+@shade AN
+...NN...
+.AAAAAA.
+
+@frame soup
+@scale 2
+@shade LD
+.LDLLDL.
+
+@frame soup_burnt
+@scale 2
+@shade C
+.CCCCCC.
+
+# A bubble in the soup, and where it pops.
+@frame bubble
+@scale 2
+I
+
+@frame pop
+@scale 2
+I.I
+.I.
+
+# Steam over the pot: one puff in three tones, fading as it rises.
+@frame steam0
+@scale 2
+Z
+
+@frame steam1
+@scale 2
+Y
+
+@frame steam2
+@scale 2
+X
+
+# Smoke over a burnt pot: a puff in two sizes.
+@frame smoke_small
+@scale 2
+9
+
+@frame smoke_big
+@scale 2
+.89.
+8999
+
+# Seasoning flakes, one block each.
+@frame flake_e
+@scale 2
+e
+
+@frame flake_y
+@scale 2
+y
+
+@frame flake_l
+@scale 2
+l
+
+# A thought bubble as in a comic: two small bubbles lead up from his head to a cloud with an outline; the cloud
+# fills with dots one at a time. Block by block: white inside, a bluish outline.
+@frame tail_small
+@scale 2
++
+
+@frame tail_big
+@scale 2
+++
+
+@frame cloud_grow
+@scale 2
+.===.
+=+++=
+.===.
+
+@frame cloud_0
+@scale 2
+..==.==..
+.=++=++=.
+=+++++++=
+.=+++++=.
+..=====..
+
+@frame cloud_1
+@scale 2
+..==.==..
+.=++=++=.
+=+P+++++=
+.=+++++=.
+..=====..
+
+@frame cloud_2
+@scale 2
+..==.==..
+.=++=++=.
+=+P+P+++=
+.=+++++=.
+..=====..
+
+@frame cloud_3
+@scale 2
+..==.==..
+.=++=++=.
+=+P+P+P+=
+.=+++++=.
+..=====..
+
+# Dishes, five blocks by two, set on the plate when he serves.
+@frame dish_roast
+@scale 2
+@shade mnM
+.mMm.
+mmnmm
+
+@frame dish_salad
+@scale 2
+@shade lui
+.lul.
+iulul
+
+@frame dish_cake
+@scale 2
+@shade neHn
+.HeH.
+nnnnn
+
+# A sparkle for the dish: one yellow block.
+@frame star
+@scale 2
+x
+
+# Z for sleep, in two sizes; pixels, free of the grid (nothing else is near them).
+@frame z_small
+zzzz
+..z.
+.z..
+zzzz
+
+@frame z_big
+zzzzzz
+....z.
+...z..
+..z...
+.z....
+zzzzzz
