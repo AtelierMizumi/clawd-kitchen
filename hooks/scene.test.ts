@@ -1,56 +1,98 @@
 // Spec for composing the kitchen scene (hooks/lib/scene.ts).
+// The scene is 104×16 pixels (52 cells by 8 rows) with FX_ROWS cell rows of braille effects on top.
+// Everything that stays put sits on cell boundaries, and what Clawd holds is placed from his hand.
 import { describe, expect, test } from 'claude-code/testing'
 
 import { DATA } from './gen/data'
-import { toCells } from './lib/raster'
-import type { Pose } from './lib/clawd'
-import { NONE } from './lib/actions'
-import type { Action } from './lib/actions'
-import { FLAME_STEP_MS, FX_ROWS, renderScene, sceneCells } from './lib/scene'
+import { NONE } from './lib/action'
+import type { Action } from './lib/action'
+import { handAnchor, poseOf } from './lib/clawd'
+import { CELL_H, CELL_W, toCells } from './lib/raster'
+import { FLAME_STEP_MS, FX_ROWS, renderScene, sceneCells, tablePx } from './lib/scene'
 
 const comfy = DATA.scenes.comfy
-const pose: Pose = { eyes: 'open', arms: 'rest', legs: 'stand', glow: 1 }
+const pose = poseOf({ glow: 1 })
+const TOP = FX_ROWS * CELL_H
+const SHADOW = 0xb35a3d
+const EYE = 0x2b1f1a
+const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + TOP) * c.width + x]
+const isBraille = (cp: number) => cp > 0x2800 && cp <= 0x28ff
+const columns = comfy.width / CELL_W
 
 describe('renderScene', () => {
   test('canvas has the scene size plus the effects rows on top', () => {
     const c = renderScene('comfy', pose)
     expect(c.width).toBe(comfy.width)
-    expect(c.height).toBe(comfy.height + FX_ROWS * 2)
+    expect(c.height).toBe(comfy.height + TOP)
   })
 
   test("draws Clawd's body at the scene offset, below the effects rows", () => {
     const c = renderScene('comfy', pose)
     const [x, y] = comfy.clawd
-    // The body starts 2px in from Clawd's left edge (the arm), on his top row.
-    expect(c.px[(y + FX_ROWS * 2) * c.width + x + 2]).toBe(DATA.frames.clawd_body.pixels[0])
+    // The body starts 4px in from Clawd's left edge (the arm), on his top row.
+    expect(px(c, x + 4, y)).toBe(DATA.frames.clawd_body.pixels[0])
+  })
+
+  test('Clawd stands on cell boundaries, so his art keeps its two-colour cells', () => {
+    expect(comfy.clawd[0] % CELL_W).toBe(0)
+    expect(comfy.clawd[1] % CELL_H).toBe(0)
   })
 
   test('draws every prop of the scene', () => {
     const c = renderScene('comfy', pose)
     for (const [name, x, y] of comfy.props) {
       const f = DATA.frames[name as keyof typeof DATA.frames]
-      const i = f.pixels.findIndex(p => p !== null)
-      const px = x + (i % f.width)
-      const py = y + Math.floor(i / f.width) + FX_ROWS * 2
-      expect(c.px[py * c.width + px]).toBe(f.pixels[i])
+      // The last opaque pixel: the table at rest hides the left end of the floor line.
+      const i = f.pixels.findLastIndex(p => p !== null)
+      const at = [x + (i % f.width), y + Math.floor(i / f.width)] as const
+      expect(px(c, at[0], at[1])).toBe(f.pixels[i])
+    }
+  })
+
+  test("the floor is a line along the bottom of the scene, under Clawd's feet", () => {
+    const c = renderScene('comfy', pose)
+    const floor = DATA.frames.floor
+    expect(floor.width).toBe(comfy.width)
+    expect(px(c, comfy.width - 1, comfy.height - 1)).toBe(floor.pixels[0])
+    expect(px(c, comfy.table.work + DATA.frames.prep_front.width + 2, comfy.height - 1)).toBe(floor.pixels[0])
+    const [cx, cy] = comfy.clawd
+    expect(px(c, cx + 6, cy + 6)).toBe(SHADOW)
+  })
+
+  test('the static props sit on cell boundaries, but for the one-pixel floor line', () => {
+    for (const [name, x, y] of comfy.props) {
+      if (name === 'floor') continue
+      expect(`${name} ${x % CELL_W} ${y % CELL_H}`).toBe(`${name} 0 0`)
+    }
+    expect(DATA.frames.floor.height).toBe(1)
+    expect(comfy.props.find(p => p[0] === 'floor')![2]).toBe(comfy.height - 1)
+    for (const key of ['pan', 'flame', 'pot', 'phone'] as const) {
+      expect(`${key} ${comfy[key][0] % CELL_W} ${comfy[key][1] % CELL_H}`).toBe(`${key} 0 0`)
     }
   })
 })
 
 describe('sceneCells', () => {
-  const isBraille = (cp: number) => cp > 0x2800 && cp <= 0x28ff
   const brailleColumns = (t: number) => {
     const cells = sceneCells('comfy', pose, t)
     const cols = new Set<number>()
-    for (let i = 0; i < cells.length; i += 3) if (isBraille(cells[i]!)) cols.add((i / 3) % comfy.width)
+    for (let i = 0; i < cells.length; i += 3) if (isBraille(cells[i]!)) cols.add((i / 3) % columns)
     return cols
   }
+
+  test('the scene is width / 2 cell columns wide and (height + effects rows) / 2 rows tall', () => {
+    const cells = sceneCells('comfy', pose, 0)
+    expect(cells.length / 3).toBe(columns * ((comfy.height + TOP) / CELL_H))
+  })
 
   test('steam rises above every steam source of the scene', () => {
     // Over a second of animation, each source shows steam within a cell of it.
     const seen = new Set<number>()
     for (let t = 0; t < 1000; t += 100) for (const c of brailleColumns(t)) seen.add(c)
-    for (const [x] of comfy.steam) expect([x - 1, x, x + 1].some(c => seen.has(c))).toBe(true)
+    for (const [x] of comfy.steam) {
+      const col = Math.floor(x / CELL_W)
+      expect([col - 1, col, col + 1].some(c => seen.has(c))).toBe(true)
+    }
   })
 
   test('steam never covers pixels of the scene', () => {
@@ -70,12 +112,7 @@ describe('sceneCells', () => {
 })
 
 describe('renderScene with an action', () => {
-  const top = FX_ROWS * 2
-  const pixel = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
   const panFrame = DATA.frames.pan
-  const first = panFrame.pixels.findIndex(p => p !== null)
-  const fx = first % panFrame.width
-  const fy = Math.floor(first / panFrame.width)
   const [panX, panY] = comfy.pan
   const [flameX, flameY] = comfy.flame
   const flameA = DATA.frames.flame_a
@@ -83,51 +120,72 @@ describe('renderScene with an action', () => {
   const lifted: Action = { ...NONE, panDy: -2, isFlameOn: true }
 
   test('the pan rests at its anchor when the action is empty', () => {
-    expect(pixel(renderScene('comfy', pose, NONE), panX + fx, panY + fy)).toBe(panFrame.pixels[first])
+    const c = renderScene('comfy', pose, NONE)
+    for (let y = 0; y < panFrame.height; y++) {
+      for (let x = 0; x < panFrame.width; x++) {
+        const want = panFrame.pixels[y * panFrame.width + x]
+        if (want !== null) expect(px(c, panX + x, panY + y)).toBe(want)
+      }
+    }
   })
 
-  test('a lifted pan moves up by panDy', () => {
+  test('a lifted pan moves up by panDy and leaves its old bottom row empty', () => {
     const c = renderScene('comfy', pose, { ...NONE, panDy: -2 })
-    expect(pixel(c, panX + fx, panY + fy - 2)).toBe(panFrame.pixels[first])
-    expect(pixel(c, panX + fx, panY + fy)).not.toBe(panFrame.pixels[first])
+    for (let y = 0; y < panFrame.height; y++) {
+      for (let x = 0; x < panFrame.width; x++) {
+        const want = panFrame.pixels[y * panFrame.width + x]
+        if (want !== null) expect(px(c, panX + x, panY + y - 2)).toBe(want)
+      }
+    }
+    const lastRow = (panFrame.height - 1) * panFrame.width
+    const bottomX = panFrame.pixels.slice(lastRow).findIndex(p => p !== null)
+    expect(px(c, panX + bottomX, panY + panFrame.height - 1)).not.toBe(panFrame.pixels[lastRow + bottomX])
   })
 
   test('flames show under a lifted pan, flickering between two frames', () => {
     const lastRow = flameA.height - 1
     const a = renderScene('comfy', pose, lifted, 0)
     const b = renderScene('comfy', pose, lifted, FLAME_STEP_MS)
-    expect(pixel(a, flameX, flameY + lastRow)).toBe(flameA.pixels[lastRow * flameA.width])
-    expect(pixel(b, flameX, flameY + lastRow)).toBe(flameB.pixels[lastRow * flameB.width])
-    expect(flameA.pixels[lastRow * flameA.width]).not.toBe(flameB.pixels[lastRow * flameB.width])
+    expect(px(a, flameX + 2, flameY)).toBe(flameA.pixels[2])
+    expect(px(b, flameX, flameY)).toBe(flameB.pixels[0])
+    expect(flameA.pixels[0]).not.toBe(flameB.pixels[0])
+    expect(px(a, flameX, flameY + lastRow)).toBe(flameA.pixels[lastRow * flameA.width])
   })
 
   test('no flames when the flame is off', () => {
     const c = renderScene('comfy', pose, { ...NONE, panDy: -2 })
-    expect(pixel(c, flameX, flameY + flameA.height - 1)).not.toBe(flameA.pixels[(flameA.height - 1) * flameA.width])
+    expect(px(c, flameX + 2, flameY + flameA.height - 1)).not.toBe(flameA.pixels[(flameA.height - 1) * flameA.width])
   })
 
-  test('flying food is drawn pixel by pixel in its own colour', () => {
-    const c = renderScene('comfy', pose, { ...NONE, panDy: -2, bits: [{ color: 0xe2493b, x: 20, y: 0 }, { color: 0x7cc456, x: 22, y: 1 }] })
-    expect(pixel(c, 20, 0)).toBe(0xe2493b)
-    expect(pixel(c, 22, 1)).toBe(0x7cc456)
+  test('flying food is a piece two pixels wide in its own colour', () => {
+    const c = renderScene('comfy', pose, { ...NONE, panDy: -2, bits: [{ color: 0xe2493b, x: 20, y: 0 }, { color: 0x7cc456, x: 23, y: 1 }] })
+    expect([px(c, 20, 0), px(c, 21, 0)]).toEqual([0xe2493b, 0xe2493b])
+    expect([px(c, 23, 1), px(c, 24, 1)]).toEqual([0x7cc456, 0x7cc456])
+    expect(px(c, 22, 0)).toBeNull()
+  })
+
+  test('a piece at the edge of the scene is clipped, not wrapped', () => {
+    const c = renderScene('comfy', pose, { ...NONE, bits: [{ color: 0xe2493b, x: comfy.width - 1, y: 1 }, { color: 0x7cc456, x: -1, y: 1 }] })
+    expect(px(c, comfy.width - 1, 1)).toBe(0xe2493b)
+    expect(px(c, 0, 1)).toBe(0x7cc456)
+    expect(px(c, 1, 1)).not.toBe(0x7cc456)
   })
 
   test('food above the scene lands in the effects rows instead of vanishing', () => {
     const c = renderScene('comfy', pose, { ...NONE, panDy: -2, bits: [{ color: 0xffe27a, x: 24, y: -2 }] })
-    expect(c.px[0 * c.width + 24]).toBe(0xffe27a)
+    expect(c.px[(TOP - 2) * c.width + 24]).toBe(0xffe27a)
   })
 })
 
 describe('the phone and the bubble above it', () => {
   const [phoneX, phoneY] = comfy.phone
   const [bubbleX, bubbleY] = comfy.bubble
-  const top = FX_ROWS * 2
-  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
   const phone = DATA.frames.phone
   const bubble = DATA.frames.bubble
   const inkA = DATA.frames.phone_ink_a.pixels[0]
   const inkB = DATA.frames.phone_ink_b.pixels[0]
   const thumb = DATA.frames.clawd_arm.pixels[0]
+  const holding = poseOf({ glow: 1, armL: 'lift', eyes: 'left' })
   const scrolling = (thumbRow: number | null, scroll: number, dish: Action['dish'] = null): Action => ({
     ...NONE,
     phone: { thumb: thumbRow, scroll },
@@ -135,62 +193,90 @@ describe('the phone and the bubble above it', () => {
   })
 
   test('nothing is drawn for either while Clawd is not on his phone', () => {
-    const c = renderScene('comfy', pose)
+    const c = renderScene('comfy', holding)
     expect(px(c, phoneX, phoneY)).not.toBe(phone.pixels[0])
     expect(px(c, bubbleX + 1, bubbleY)).not.toBe(bubble.pixels[1])
   })
 
   test('the phone is drawn at its place, with its frame', () => {
-    const c = renderScene('comfy', pose, scrolling(null, 0))
+    const c = renderScene('comfy', holding, scrolling(null, 0))
     for (let y = 0; y < phone.height; y++) expect(px(c, phoneX, phoneY + y)).toBe(phone.pixels[y * phone.width])
     expect(px(c, phoneX + phone.width - 1, phoneY + phone.height - 1)).toBe(phone.pixels[phone.pixels.length - 1])
   })
 
+  test("the phone sits against Clawd's raised hand and follows it when he leans or crouches", () => {
+    const [cx, cy] = comfy.clawd
+    for (const [lean, squash] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const p = poseOf({ glow: 1, armL: 'lift', lean, squash })
+      const [ax, ay] = handAnchor(p, 'L')
+      const c = renderScene('comfy', p, scrolling(null, 0))
+      expect(px(c, cx + ax - phone.width, cy + ay - 1)).toBe(phone.pixels[0])
+      expect(px(c, cx + ax - 1, cy + ay - 1 + phone.height - 1)).toBe(phone.pixels[phone.pixels.length - 1])
+    }
+    expect(phoneX + phone.width).toBe(comfy.clawd[0])
+  })
+
+  test('the bubble follows the phone when he leans or crouches, so its tail still touches it', () => {
+    const [cx, cy] = comfy.clawd
+    const lastRow = bubble.height - 1
+    const xs = Array.from({ length: bubble.width }, (_, x) => x).filter(x => bubble.pixels[lastRow * bubble.width + x] !== null)
+    for (const [lean, squash] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const p = poseOf({ glow: 1, armL: 'lift', lean, squash })
+      const [ax, ay] = handAnchor(p, 'L')
+      const [phoneLeft, phoneTop] = [cx + ax - phone.width, cy + ay - 1]
+      const c = renderScene('comfy', p, scrolling(null, 0))
+      const dx = phoneLeft - phoneX
+      expect(px(c, bubbleX + dx + xs[0]!, phoneTop - 1)).toBe(bubble.pixels[lastRow * bubble.width + xs[0]!])
+      expect(bubbleX + dx + xs[0]!).toBeGreaterThanOrEqual(phoneLeft)
+      expect(bubbleX + dx + xs[0]!).toBeLessThan(phoneLeft + phone.width)
+    }
+  })
+
   test('the screen rows alternate between two inks, and scrolling swaps which row has which', () => {
     for (const scroll of [0, 1, 2, 3]) {
-      const c = renderScene('comfy', pose, scrolling(null, scroll))
-      for (let r = 0; r < 4; r++) {
+      const c = renderScene('comfy', holding, scrolling(null, scroll))
+      for (let r = 0; r < phone.height - 2; r++) {
         const want = (r + scroll) % 2 === 0 ? inkA : inkB
-        expect(px(c, phoneX + 1, phoneY + 1 + r)).toBe(want)
-        expect(px(c, phoneX + 2, phoneY + 1 + r)).toBe(want)
+        for (let x = 1; x < phone.width - 1; x++) expect(px(c, phoneX + x, phoneY + 1 + r)).toBe(want)
       }
     }
   })
 
-  test('the thumb is a pixel of Clawd on the screen at its row, and gone when lifted', () => {
+  test('the thumb is two pixels of Clawd on the screen at its row, and gone when lifted', () => {
     for (const row of [0, 1, 2, 3]) {
-      expect(px(renderScene('comfy', pose, scrolling(row, 0)), phoneX + 2, phoneY + 1 + row)).toBe(thumb)
+      const c = renderScene('comfy', holding, scrolling(row, 0))
+      for (const x of [phone.width - 3, phone.width - 2]) expect(px(c, phoneX + x, phoneY + 1 + row)).toBe(thumb)
     }
-    const c = renderScene('comfy', pose, scrolling(null, 0))
-    for (let r = 0; r < 4; r++) expect(px(c, phoneX + 2, phoneY + 1 + r)).not.toBe(thumb)
+    const c = renderScene('comfy', holding, scrolling(null, 0))
+    for (let r = 0; r < phone.height - 2; r++) expect(px(c, phoneX + phone.width - 2, phoneY + 1 + r)).not.toBe(thumb)
   })
 
   test('the bubble sits right above the phone and shows the dish inside its frame', () => {
     expect(bubbleY + bubble.height).toBe(phoneY)
     for (const dish of ['burger', 'egg', 'ramen'] as const) {
       const sprite = DATA.frames[`dish_${dish}` as const]
-      const c = renderScene('comfy', pose, scrolling(null, 0, dish))
+      const c = renderScene('comfy', holding, scrolling(null, 0, dish))
       for (let y = 0; y < sprite.height; y++) {
         for (let x = 0; x < sprite.width; x++) {
           const want = sprite.pixels[y * sprite.width + x]
-          if (want !== null) expect(px(c, bubbleX + 1 + x, bubbleY + 1 + y)).toBe(want)
+          if (want !== null) expect(px(c, bubbleX + 2 + x, bubbleY + 2 + y)).toBe(want)
         }
       }
     }
   })
 
   test('the bubble is an empty screen while there is no dish', () => {
-    const c = renderScene('comfy', pose, scrolling(null, 0, null))
+    const c = renderScene('comfy', holding, scrolling(null, 0, null))
     expect(px(c, bubbleX, bubbleY + 3)).toBe(bubble.pixels[3 * bubble.width])
     expect(px(c, bubbleX + 3, bubbleY + 3)).toBe(bubble.pixels[3 * bubble.width + 3])
   })
 
-  test('the dishes fit the bubble\'s body exactly, so its outline is never covered', () => {
+  test("the dishes fit the bubble's inside with a pixel to spare, so its outline is never covered", () => {
     const body = bubble.height - comfy.bubbleTail
     for (const dish of ['burger', 'egg', 'ramen'] as const) {
       const sprite = DATA.frames[`dish_${dish}` as const]
-      expect(sprite.width).toBe(bubble.width - 2)
-      expect(sprite.height).toBe(body - 2)
+      expect(sprite.width).toBe(bubble.width - 4)
+      expect(sprite.height).toBe(body - 4)
     }
   })
 
@@ -204,42 +290,42 @@ describe('the phone and the bubble above it', () => {
     expect(tail).toBeGreaterThanOrEqual(2)
     const rowWidth = (r: number) => Array.from({ length: bubble.width }, (_, x) => bubble.pixels[r * bubble.width + x]).filter(p => p !== null).length
     const widths = Array.from({ length: tail }, (_, i) => rowWidth(bubble.height - tail + i))
-    expect(widths[widths.length - 1]).toBe(1)
+    expect(widths[widths.length - 1]).toBe(2)
     for (let i = 1; i < widths.length; i++) expect(widths[i]!).toBeLessThan(widths[i - 1]!)
     const lastRow = bubble.height - 1
-    const apex = Array.from({ length: bubble.width }, (_, x) => x).find(x => bubble.pixels[lastRow * bubble.width + x] !== null)!
-    expect(bubbleX + apex).toBeGreaterThanOrEqual(phoneX)
-    expect(bubbleX + apex).toBeLessThan(phoneX + phone.width)
-    const c = renderScene('comfy', pose, scrolling(null, 0))
-    expect(px(c, bubbleX + apex, phoneY - 1)).toBe(bubble.pixels[lastRow * bubble.width + apex])
+    const xs = Array.from({ length: bubble.width }, (_, x) => x).filter(x => bubble.pixels[lastRow * bubble.width + x] !== null)
+    for (const apex of xs) {
+      expect(bubbleX + apex).toBeGreaterThanOrEqual(phoneX)
+      expect(bubbleX + apex).toBeLessThan(phoneX + phone.width)
+    }
+    const c = renderScene('comfy', holding, scrolling(null, 0))
+    expect(px(c, bubbleX + xs[0]!, phoneY - 1)).toBe(bubble.pixels[lastRow * bubble.width + xs[0]!])
   })
 
-  test('the phone sits against Clawd\'s raised hand, clear of the shelf and the hat', () => {
-    expect(phoneX + phone.width).toBe(comfy.clawd[0])
+  test('the phone and bubble are clear of the shelf and the hat', () => {
     const jars = DATA.frames.jars
     const jarsX = comfy.props.find(p => p[0] === 'jars')![1] as number
     expect(bubbleX).toBeGreaterThanOrEqual(jarsX + jars.width)
-    expect(bubbleX + bubble.width).toBeLessThanOrEqual(comfy.clawd[0] + 3)
+    expect(bubbleX + bubble.width).toBeLessThanOrEqual(comfy.clawd[0] + 6)
   })
 })
 
 describe('the prep table', () => {
   const tab = comfy.table
-  const top = FX_ROWS * 2
-  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
   const back = DATA.frames.prep_back
   const front = DATA.frames.prep_front
   const flat = DATA.frames.knife
   const held = DATA.frames.knife_v
   const food = (kind: 'meat' | 'cucumber' | 'carrot') => DATA.frames[kind]
   const at = (tableX: number, extra: Partial<Action> = {}): Action => ({ ...NONE, tableX, ...extra })
-  const holding = (extra: Partial<Action> = {}): Action => at(tab.work, { knife: { x: tab.work + tab.knifeX, hy: tab.foodY - 3 }, ...extra })
+  const choppingPose = poseOf({ glow: 1, eyes: 'down', armL: 'hold', handL: -4 })
+  const holding = (extra: Partial<Action> = {}): Action => at(tab.work, { knife: true, ...extra })
   const rows = 4
-  const colOf = (sprite: { width: number; pixels: readonly (number | null)[] }, i: number) =>
-    Array.from({ length: rows }, (_, r) => sprite.pixels[r * sprite.width + i])
+  type Sheet = { width: number; pixels: readonly (number | null)[] }
+  const colOf = (sprite: Sheet, i: number) => Array.from({ length: rows }, (_, r) => sprite.pixels[r * sprite.width + i])
   // A sprite's transparent corners show what is behind it, so a column is "shown"
   // when every opaque pixel of it is on the canvas in the right colour.
-  const shows = (c: ReturnType<typeof renderScene>, x: number, sprite: { width: number; pixels: readonly (number | null)[] }, i: number) =>
+  const shows = (c: ReturnType<typeof renderScene>, x: number, sprite: Sheet, i: number) =>
     colOf(sprite, i).every((color, r) => color === null || px(c, x, tab.foodY + r) === color)
 
   test('rests on the left, partly off the edge, with its top row at the table height', () => {
@@ -250,10 +336,23 @@ describe('the prep table', () => {
     expect(px(c, 0, tab.frontY + 1)).toBe(front.pixels[front.width + rel])
   })
 
-  test('is drawn where the action puts it, rounded to a whole pixel', () => {
+  test('is drawn on the nearest whole cell: the art is cell-aligned, so the table moves a cell at a time', () => {
+    expect([3.2, 3.9, 4, 4.4, 4.99].map(tablePx)).toEqual([4, 4, 4, 4, 4])
+    expect([5.1, 6, 6.9].map(tablePx)).toEqual([6, 6, 6])
     const c = renderScene('comfy', pose, at(4.4))
     expect(px(c, 4, tab.frontY)).toBe(front.pixels[0])
     expect(px(c, 4 + front.width - 1, tab.frontY)).toBe(front.pixels[front.width - 1])
+    expect(px(c, 3, tab.frontY)).not.toBe(front.pixels[0])
+  })
+
+  test('mid-slide at any position the table has no gaps and no doubled columns', () => {
+    for (let x = -20; x <= 4; x += 0.37) {
+      const c = renderScene('comfy', pose, at(x))
+      const x0 = tablePx(x)
+      for (let col = Math.max(0, x0); col < Math.min(comfy.width, x0 + front.width); col++) {
+        expect(`${x.toFixed(2)} ${col} ${px(c, col, tab.frontY) === front.pixels[col - x0]}`).toBe(`${x.toFixed(2)} ${col} true`)
+      }
+    }
   })
 
   test('a whole ingredient lies on it, ending at the food edge', () => {
@@ -261,7 +360,7 @@ describe('the prep table', () => {
       const sprite = food(kind)
       const c = renderScene('comfy', pose, at(tab.rest, { ingredient: { kind, cut: 0, flying: false } }))
       const x0 = tab.rest + tab.foodEnd - sprite.width + 1
-      for (let i = 0; i < sprite.width; i++) expect(shows(c, x0 + i, sprite, i)).toBe(true)
+      for (let i = 0; i < sprite.width; i++) if (x0 + i >= 0) expect(shows(c, x0 + i, sprite, i)).toBe(true)
     }
   })
 
@@ -273,96 +372,104 @@ describe('the prep table', () => {
   test('after a cut the rest of the ingredient slides to the knife and shows the flat cut face', () => {
     const meat = food('meat')
     const cut = DATA.frames.meat_cut
-    const c = renderScene('comfy', pose, holding({ ingredient: { kind: 'meat', cut: 1, flying: false } }))
-    const keep = meat.width - 2
+    const slice = DATA.frames.meat_slice
+    const c = renderScene('comfy', choppingPose, holding({ ingredient: { kind: 'meat', cut: 1, flying: false } }))
+    const keep = meat.width - slice.width
     const x0 = tab.work + tab.foodEnd - keep + 1
-    for (let i = 0; i < keep - 1; i++) expect(shows(c, x0 + i, meat, i)).toBe(true)
-    expect(shows(c, x0 + keep - 1, cut, 0)).toBe(true)
+    for (let i = 0; i < keep - cut.width; i++) expect(shows(c, x0 + i, meat, i)).toBe(true)
+    for (let j = 0; j < cut.width; j++) expect(shows(c, x0 + keep - cut.width + j, cut, j)).toBe(true)
     expect(shows(c, x0 - 1, meat, 0)).toBe(false)
   })
 
-  test('cut slices lie in a fanned pile, each overlapping the one before', () => {
+  test('cut slices lie in a fanned pile, one cell over from the last and overlapping it', () => {
     const slice = DATA.frames.meat_slice
-    const c = renderScene('comfy', pose, holding({ ingredient: { kind: 'meat', cut: 3, flying: false } }))
+    const c = renderScene('comfy', choppingPose, holding({ ingredient: { kind: 'meat', cut: 3, flying: false } }))
     for (let k = 0; k < 3; k++) {
-      const lastOfRow = k === 2
-      const x = tab.work + tab.pileX + k
-      expect(shows(c, x, slice, 0)).toBe(true)
-      if (lastOfRow) expect(shows(c, x + 1, slice, 1)).toBe(true)
+      const x = tab.work + tab.pileX + k * CELL_W
+      for (let i = 0; i < CELL_W; i++) expect(shows(c, x + i, slice, i)).toBe(true)
     }
-    expect(shows(c, tab.work + tab.pileX + 3, slice, 0)).toBe(false)
+    const last = tab.work + tab.pileX + 2 * CELL_W
+    for (let i = 0; i < slice.width; i++) expect(shows(c, last + i, slice, i)).toBe(true)
+    expect(shows(c, tab.work + tab.pileX + 3 * CELL_W, slice, 0)).toBe(false)
   })
 
   test('a flying slice is already off the ingredient but not yet in the pile', () => {
     const slice = DATA.frames.cucumber_slice
     const c = renderScene(
       'comfy',
-      pose,
+      choppingPose,
       holding({
         ingredient: { kind: 'cucumber', cut: 1, flying: true },
-        slice: { kind: 'cucumber', x: tab.work + 9, y: tab.foodY - 2 },
+        slice: { kind: 'cucumber', x: tab.work + 18, y: tab.foodY - 4 },
       }),
     )
-    expect(px(c, tab.work + 9, tab.foodY - 2)).toBe(slice.pixels[0])
-    const keep = food('cucumber').width - 4
+    expect(px(c, tab.work + 18, tab.foodY - 4)).toBe(slice.pixels[0])
+    const keep = food('cucumber').width - 2 * slice.width
     expect(shows(c, tab.work + tab.foodEnd - keep + 1, food('cucumber'), 0)).toBe(true)
-    expect(shows(c, tab.work + tab.pileX, DATA.frames.cucumber_slice, 0)).toBe(true)
-    expect(shows(c, tab.work + tab.pileX + 1, DATA.frames.cucumber_slice, 0)).toBe(false)
+    expect(shows(c, tab.work + tab.pileX, slice, 0)).toBe(true)
+    expect(shows(c, tab.work + tab.pileX + CELL_W, slice, 0)).toBe(false)
   })
 
-  test('the held knife is drawn from its handle row, and then the lying one is gone', () => {
-    const hy = tab.foodY - 3
-    const c = renderScene('comfy', pose, at(tab.work, { knife: { x: tab.work + tab.knifeX, hy } }))
-    for (let i = 0; i < held.height; i++) expect(px(c, tab.work + tab.knifeX, hy + i)).toBe(held.pixels[i])
+  test('the held knife is drawn from the left hand, handle row first, and then the lying one is gone', () => {
+    const [cx, cy] = comfy.clawd
+    for (const handL of [-2, 0, 2]) {
+      const p = poseOf({ glow: 1, armL: 'hold', handL })
+      const [ax, ay] = handAnchor(p, 'L')
+      const c = renderScene('comfy', p, at(tab.work, { knife: true }))
+      for (let i = 0; i < held.height; i++) expect(px(c, cx + ax - held.width, cy + ay + i)).toBe(held.pixels[i * held.width])
+    }
+    const c = renderScene('comfy', choppingPose, at(tab.work, { knife: true }))
     expect(px(c, tab.work + tab.flatKnifeX, tab.flatKnifeY)).not.toBe(flat.pixels[0])
+  })
+
+  test("the hand's knife is where the table puts the cut: the blade falls on the food end", () => {
+    const [cx] = comfy.clawd
+    const [ax] = handAnchor(choppingPose, 'L')
+    const knifeX = cx + ax - held.width
+    expect(knifeX).toBe(tab.work + tab.knifeX)
   })
 
   test('the dark backsplash is behind the food only, so it never cuts through Clawd', () => {
     const c = renderScene('comfy', pose, at(tab.work))
     expect(px(c, tab.work + tab.backX, tab.backY)).toBe(back.pixels[0])
     expect(px(c, tab.work + tab.backX - 1, tab.backY)).not.toBe(back.pixels[0])
-    const clawdX = comfy.clawd[0]
-    expect(tab.work + tab.backX + back.width).toBeLessThanOrEqual(clawdX)
+    expect(tab.work + tab.backX + back.width).toBeLessThanOrEqual(comfy.clawd[0])
   })
 
-  test('the front of the table is drawn over Clawd\'s near leg, and leaves the far legs alone', () => {
+  test("the front of the table is drawn over Clawd's near leg, and leaves the far legs alone", () => {
     const c = renderScene('comfy', pose, at(tab.work))
     const [cx, cy] = comfy.clawd
-    const nearLeg = cx + 3
-    const farLeg = cx + 5
+    const nearLeg = cx + 4 + 2
+    const farLeg = cx + 4 + 6
     expect(nearLeg - tab.work).toBeLessThan(front.width)
     expect(px(c, nearLeg, tab.frontY)).toBe(front.pixels[nearLeg - tab.work])
     expect(farLeg - tab.work).toBeGreaterThanOrEqual(front.width)
-    expect(px(c, farLeg, cy + 5)).toBe(0xb35a3d)
+    expect(px(c, farLeg, cy + 6)).toBe(SHADOW)
   })
 
-  test('while chopping nothing of the table or the food covers Clawd\'s eyes', () => {
+  test("while chopping nothing of the table or the food covers Clawd's eyes", () => {
     const [cx, cy] = comfy.clawd
-    const chopping: Pose = { ...pose, eyes: 'down', reach: 1 }
-    const c = renderScene('comfy', chopping, holding({ ingredient: { kind: 'carrot', cut: 2, flying: false } }))
-    for (const ex of [4, 8]) for (const r of [2, 3]) expect(px(c, cx + ex, cy + r)).toBe(0x2b1f1a)
+    const c = renderScene('comfy', choppingPose, holding({ ingredient: { kind: 'carrot', cut: 2, flying: false } }))
+    for (const ex of [4, 5, 12, 13]) for (const r of [2, 3]) expect(px(c, cx + 4 + ex, cy + r)).toBe(EYE)
   })
 })
 
 describe('the pot', () => {
   const [potX, potY] = comfy.pot
-  const top = FX_ROWS * 2
-  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
   const lid = DATA.frames.pot_lid
   const body = DATA.frames.pot_body
-  const isBraille = (cp: number) => cp > 0x2800 && cp <= 0x28ff
 
   test('is a lid on a body, drawn at its anchor', () => {
     const c = renderScene('comfy', pose)
-    for (let x = 0; x < lid.width; x++) expect(px(c, potX + x, potY)).toBe(lid.pixels[x])
+    for (let x = 0; x < lid.width; x++) expect(px(c, potX + x, potY + 1)).toBe(lid.pixels[lid.width + x])
     for (let x = 0; x < body.width; x++) expect(px(c, potX + x, potY + lid.height)).toBe(body.pixels[x])
   })
 
   test('the lid lifts by lidDy and leaves a gap, while the body stays', () => {
     const c = renderScene('comfy', pose, { ...NONE, lidDy: -1 })
-    expect(px(c, potX + 3, potY - 1)).toBe(lid.pixels[3])
-    expect(px(c, potX + 3, potY + 1)).not.toBe(lid.pixels[lid.width + 3])
-    expect(px(c, potX + 3, potY + lid.height)).toBe(body.pixels[3])
+    expect(px(c, potX + 6, potY - 1)).toBe(lid.pixels[6])
+    expect(px(c, potX + 6, potY + 1)).not.toBe(lid.pixels[lid.width + 6])
+    expect(px(c, potX + 6, potY + lid.height)).toBe(body.pixels[6])
   })
 
   test('extra steam thickens the cloud over the pot', () => {
@@ -370,8 +477,8 @@ describe('the pot', () => {
       let n = 0
       for (let t = 0; t < 2600; t += 100) {
         const cells = sceneCells('comfy', pose, t, { action: { ...NONE, potSteam } })
-        for (let col = potX - 2; col < potX + lid.width + 2; col++) {
-          for (let row = 0; row < 6; row++) if (isBraille(cells[(row * comfy.width + col) * 3]!)) n++
+        for (let col = Math.floor(potX / CELL_W) - 2; col < Math.floor((potX + lid.width) / CELL_W) + 2; col++) {
+          for (let row = 0; row < 6; row++) if (isBraille(cells[(row * columns + col) * 3]!)) n++
         }
       }
       return n
@@ -382,35 +489,39 @@ describe('the pot', () => {
 })
 
 describe('the salt shaker', () => {
-  const top = FX_ROWS * 2
-  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
   const shaker = DATA.frames.shaker
+  const shaking = poseOf({ glow: 1, armR: 'high', eyes: 'right' })
 
-  test('is drawn where the action holds it', () => {
-    const c = renderScene('comfy', pose, { ...NONE, shaker: { x: 35, y: 5 } })
-    for (let y = 0; y < shaker.height; y++) {
-      for (let x = 0; x < shaker.width; x++) expect(px(c, 35 + x, 5 + y)).toBe(shaker.pixels[y * shaker.width + x])
+  test('is drawn at the right hand, beside the raised forearm, and jiggles by dy', () => {
+    const [cx, cy] = comfy.clawd
+    const [ax, ay] = handAnchor(shaking, 'R')
+    for (const dy of [0, 1]) {
+      const c = renderScene('comfy', shaking, { ...NONE, shaker: { dy } })
+      for (let y = 0; y < shaker.height; y++) {
+        for (let x = 0; x < shaker.width; x++) expect(px(c, cx + ax + 1 + x, cy + ay - 2 + dy + y)).toBe(shaker.pixels[y * shaker.width + x])
+      }
     }
   })
 
   test('is not drawn when nobody holds it', () => {
-    const c = renderScene('comfy', pose)
-    expect(px(c, 35, 5)).not.toBe(shaker.pixels[0])
+    const [cx, cy] = comfy.clawd
+    const [ax, ay] = handAnchor(shaking, 'R')
+    const c = renderScene('comfy', shaking)
+    expect(px(c, cx + ax + 1, cy + ay - 2)).not.toBe(shaker.pixels[0])
   })
 })
 
 describe('the served dish', () => {
   const tab = comfy.table
-  const top = FX_ROWS * 2
-  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
   const plate = DATA.frames.plate
   const dish = DATA.frames.dish_egg
-  const dishY = tab.frontY - 1 - dish.height
+  const plateY = tab.frontY - plate.height
+  const dishY = plateY - dish.height
   const serving = (dy: number): Action => ({ ...NONE, tableX: tab.work, plate: { dish: 'egg', dy } })
 
   test('a plate sits on the table top', () => {
     const c = renderScene('comfy', pose, serving(0))
-    for (let x = 0; x < plate.width; x++) expect(px(c, tab.work + tab.plateX + x, tab.frontY - 1)).toBe(plate.pixels[x])
+    for (let x = 0; x < plate.width; x++) expect(px(c, tab.work + tab.plateX + x, plateY)).toBe(plate.pixels[x])
   })
 
   test('the dish stands on the plate, lowered by dy while it falls', () => {
@@ -443,35 +554,39 @@ describe('the served dish', () => {
 
   test('nothing is served when there is no plate in the action', () => {
     const c = renderScene('comfy', pose, { ...NONE, tableX: tab.work })
-    expect(px(c, tab.work + tab.plateX, tab.frontY - 1)).not.toBe(plate.pixels[0])
+    expect(px(c, tab.work + tab.plateX, plateY)).not.toBe(plate.pixels[0])
+  })
+
+  test('the plate and the dish sit on cell boundaries', () => {
+    expect((tab.frontY - plate.height) % CELL_H).toBe(0)
+    expect((tab.frontY - plate.height - dish.height) % CELL_H).toBe(0)
+    expect((tab.work + tab.plateX) % CELL_W).toBe(0)
+    expect((tab.work + tab.dishX) % CELL_W).toBe(0)
   })
 })
 
 describe('a burnt dish and a sleeping Clawd', () => {
   const [panX, panY] = comfy.pan
-  const top = FX_ROWS * 2
-  const px = (c: ReturnType<typeof renderScene>, x: number, y: number) => c.px[(y + top) * c.width + x]
   const burnt = DATA.frames.burnt
-  const isBraille = (cp: number) => cp > 0x2800 && cp <= 0x28ff
 
-  test('a burnt lump sits in the pan when the dish is burnt, and not otherwise', () => {
+  test('a burnt lump is heaped above the pan rim when the dish is burnt, and not otherwise', () => {
     const lit = renderScene('comfy', pose, { ...NONE, isBurnt: true })
     for (let x = 0; x < burnt.width; x++) {
       const want = burnt.pixels[x]
-      if (want !== null) expect(px(lit, panX + 5 + x, panY)).toBe(want)
+      if (want !== null) expect(px(lit, panX + 10 + x, panY - burnt.height)).toBe(want)
     }
     const plain = renderScene('comfy', pose)
-    expect(px(plain, panX + 6, panY)).not.toBe(burnt.pixels[1])
+    expect(px(plain, panX + 12, panY - burnt.height)).not.toBe(burnt.pixels[2])
   })
 
   test('a z is drawn where the action floats it, small or big', () => {
     for (const big of [false, true]) {
       const zee = DATA.frames[big ? 'zee_big' : 'zee_small']
-      const c = renderScene('comfy', pose, { ...NONE, zee: { x: 32, y: 3, big } })
+      const c = renderScene('comfy', pose, { ...NONE, zee: { x: 64, y: 3, big } })
       for (let y = 0; y < zee.height; y++) {
         for (let x = 0; x < zee.width; x++) {
           const want = zee.pixels[y * zee.width + x]
-          if (want !== null) expect(px(c, 32 + x, 3 + y)).toBe(want)
+          if (want !== null) expect(px(c, 64 + x, 3 + y)).toBe(want)
         }
       }
     }
@@ -488,7 +603,6 @@ describe('a burnt dish and a sleeping Clawd', () => {
       return n
     }
     expect(darkCells(null)).toBe(0)
-    expect(darkCells({ x: panX + 5, y: panY, count: 8 })).toBeGreaterThan(0)
+    expect(darkCells({ x: panX + 10, y: panY - 3, count: 8 })).toBeGreaterThan(0)
   })
 })
-

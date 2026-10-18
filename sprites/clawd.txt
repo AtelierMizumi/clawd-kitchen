@@ -1,34 +1,30 @@
-# Clawd, built from parts by hooks/lib/clawd.ts.
-# Body 9×5: light top row (tinted by the breath), base, shadowed bottom.
+# Clawd, built from parts by hooks/lib/clawd.ts. One pixel is half a terminal cell across and a
+# half cell down, so the body is 18 wide (9 cells). Everything is drawn on the cell grid: no cell of
+# 2x2 pixels may hold more than two colours (transparent counts), so the highlight row, the base,
+# the shadow row, the eyes and the hat's pleats each live in cells with just one other colour.
+
+# Body 18x5: a highlight row (tinted by the breath), three base rows, a shadow row.
 @frame clawd_body
-hhhhhhhhh
-ooooooooo
-ooooooooo
-ooooooooo
-sssssssss
+hhhhhhhhhhhhhhhhhh
+oooooooooooooooooo
+oooooooooooooooooo
+oooooooooooooooooo
+ssssssssssssssssss
 
 @frame clawd_arm
-oo
+oooo
 
 @frame clawd_leg
-s
-s
+ss
+ss
 
 @frame clawd_eye
-k
-k
+kk
+kk
 
-# Compact size: 9×5 for a narrow band.
-@frame mini_idle
-.hhhhhhh.
-.okoooko.
-ooooooooo
-.sssssss.
-.s.s.s.s.
-
-# Chef hat: a puffy toque with a narrower band, 7 wide, sits on the 9-wide head.
+# Chef hat: a puffy toque with a narrower band and two pleats, 14 wide, sits on the 18-wide head.
 @frame chef_hat
-.cc.cc.
-ccccccc
-ccccccc
-.CCCCC.
+..cccc..cccc..
+ccccCccccCcccc
+ccccCccccCcccc
+..CCCCCCCCCC..

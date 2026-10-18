@@ -8,17 +8,20 @@ from sprites import emit_ts, parse_palette, parse_sheet
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load():
-    palette = parse_palette((ROOT / "sprites/palette.txt").read_text())
+def load_frames(folder):
+    palette = parse_palette((folder / "palette.txt").read_text())
     frames = {}
-    for sheet in sorted((ROOT / "sprites").glob("*.txt")):
+    for sheet in sorted(folder.glob("*.txt")):
         if sheet.name != "palette.txt":
             for name, frame in parse_sheet(sheet.read_text(), palette).items():
                 if name in frames:
                     raise ValueError(f"frame {name} defined in two sheets")
                 frames[name] = frame
-    scenes = json.loads((ROOT / "sprites/scenes.json").read_text())
-    return frames, scenes
+    return frames
+
+
+def load():
+    return load_frames(ROOT / "sprites"), json.loads((ROOT / "sprites/scenes.json").read_text())
 
 
 if __name__ == "__main__":
@@ -26,3 +29,8 @@ if __name__ == "__main__":
     out = ROOT / "hooks/gen/data.ts"
     out.write_text(emit_ts(frames, scenes))
     print(f"{out}: {len(frames)} frames, {len(scenes)} scenes")
+    # v3: its own palette and sheets, built beside the v2 data until v3 replaces it.
+    v3 = load_frames(ROOT / "sprites/v3")
+    out = ROOT / "hooks/gen/v3.ts"
+    out.write_text(emit_ts(v3, {}, const="V3", source="sprites/v3/*.txt"))
+    print(f"{out}: {len(v3)} frames")

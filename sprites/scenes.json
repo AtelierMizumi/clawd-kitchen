@@ -1,21 +1,26 @@
 {
   "comfy": {
-    "width": 52,
+    "width": 104,
     "height": 16,
     "clawd": [
-      20,
-      9
+      40,
+      8
     ],
     "props": [
       [
+        "floor",
+        0,
+        15
+      ],
+      [
         "stove",
-        35,
-        11
+        70,
+        10
       ],
       [
         "shelf",
-        1,
-        7
+        0,
+        8
       ],
       [
         "jars",
@@ -25,50 +30,50 @@
     ],
     "steam": [
       [
-        48,
-        5,
+        95,
+        3,
         5
       ],
       [
-        40,
-        7,
+        80,
+        5,
         4
       ]
     ],
     "pan": [
-      33,
-      8
+      66,
+      6
     ],
     "flame": [
-      37,
-      9
+      74,
+      8
     ],
     "bubble": [
-      13,
+      26,
       -2
     ],
     "table": {
-      "rest": -9,
-      "work": 1,
-      "backX": 8,
+      "rest": -18,
+      "work": 2,
+      "backX": 16,
       "backY": 10,
       "frontY": 14,
       "foodY": 10,
-      "foodEnd": 17,
-      "knifeX": 16,
-      "pileX": 1,
-      "flatKnifeX": 19,
+      "foodEnd": 35,
+      "knifeX": 32,
+      "pileX": 2,
+      "flatKnifeX": 38,
       "flatKnifeY": 13,
-      "plateX": 9,
-      "dishX": 10
+      "plateX": 18,
+      "dishX": 20
     },
     "phone": [
-      16,
+      34,
       8
     ],
     "pot": [
-      45,
-      6
+      88,
+      4
     ],
     "bubbleTail": 2
   }

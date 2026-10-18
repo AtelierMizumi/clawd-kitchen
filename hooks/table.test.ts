@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { DATA } from './gen/data'
-import { SLIDE_PX_PER_S, initialKitchen, kitchenStep, sinceArrived, slideTable } from './lib/table'
+import { SLIDE_PX_PER_S, initialKitchen, kitchenStep, sinceArrived, sinceMood, slideTable } from './lib/table'
 
 const { rest, work } = DATA.scenes.comfy.table
 const T0 = 50_000
@@ -66,5 +66,73 @@ describe('kitchenStep', () => {
   test('serving the finished dish brings the table over too', () => {
     const k = kitchenStep(initialKitchen(T0), 'serve', T0 + 100)
     expect(k.tableX).toBe(rest + dir * SLIDE_PX_PER_S * 0.1)
+  })
+})
+
+describe('the mood clock', () => {
+  test('starts when the kitchen does, and keeps running while the mood stays', () => {
+    let k = initialKitchen(T0)
+    expect(sinceMood(k, T0 + 250)).toBe(250)
+    k = kitchenStep(k, 'idle', T0 + 400)
+    expect(sinceMood(k, T0 + 900)).toBe(900)
+  })
+
+  test('a change of mood restarts it, so each motion begins at its first keyframe', () => {
+    let k = kitchenStep(initialKitchen(T0), 'idle', T0 + 300)
+    k = kitchenStep(k, 'thinking', T0 + 500)
+    expect(sinceMood(k, T0 + 500)).toBe(0)
+    expect(sinceMood(k, T0 + 800)).toBe(300)
+    k = kitchenStep(k, 'thinking', T0 + 900)
+    expect(sinceMood(k, T0 + 1000)).toBe(500)
+    k = kitchenStep(k, 'stir', T0 + 1100)
+    expect(sinceMood(k, T0 + 1100)).toBe(0)
+  })
+
+  test('is never negative', () => {
+    expect(sinceMood(initialKitchen(T0), T0 - 50)).toBe(0)
+  })
+
+  test('the table takes about half a second over its ten cells: seven ticks, enough to show a pull begin, tug and settle', () => {
+    expect(travelMs).toBeGreaterThanOrEqual(480)
+    expect(travelMs).toBeLessThanOrEqual(640)
+  })
+})
+
+describe('the dish rotation', () => {
+  const cycles = (k: ReturnType<typeof initialKitchen>) => k.dishBase
+
+  test('starts at the first dish, and does not move while Clawd thinks', () => {
+    let k = initialKitchen(T0)
+    expect(cycles(k)).toBe(0)
+    k = kitchenStep(k, 'thinking', T0 + 100)
+    k = kitchenStep(k, 'thinking', T0 + 5000)
+    expect(cycles(k)).toBe(0)
+  })
+
+  /** Thinks from T0 to T0 + ms (the last frame of thinking), then moves on to `next` one tick later. */
+  const thinkFor = (k: ReturnType<typeof initialKitchen>, from: number, ms: number, next: 'stir' | 'season') => {
+    let out = kitchenStep(k, 'thinking', from)
+    out = kitchenStep(out, 'thinking', from + ms)
+    return kitchenStep(out, next, from + ms + 80)
+  }
+
+  test('a spell cut short before the dish appeared moves nothing on: the dish was never seen', () => {
+    for (const ms of [0, 150, 399]) expect(cycles(thinkFor(initialKitchen(T0), T0, ms, 'stir'))).toBe(0)
+    expect(cycles(thinkFor(initialKitchen(T0), T0, 400, 'stir'))).toBe(1)
+  })
+
+  test('leaving thinking moves it on by the cycles played, a cycle whose dish was shown counting as played', () => {
+    let k = thinkFor(initialKitchen(T0), T0, 1000, 'stir')
+    expect(cycles(k)).toBe(1)
+    k = thinkFor(k, T0 + 2000, 4500, 'season')
+    expect(cycles(k)).toBe(1 + 3)
+  })
+
+  test('other moods leave it alone', () => {
+    let k = initialKitchen(T0)
+    for (const [i, mood] of (['idle', 'typing', 'stir', 'simmer', 'serve', 'smoke', 'sleep'] as const).entries()) {
+      k = kitchenStep(k, mood, T0 + i * 700)
+    }
+    expect(cycles(k)).toBe(0)
   })
 })
