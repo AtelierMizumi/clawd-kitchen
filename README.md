@@ -1,23 +1,28 @@
 # clawd-kitchen
 
 A small pixel-art kitchen that lives above your Claude Code prompt. Clawd, the
-orange Claude Code mascot, stands by the stove: breathing, blinking, glancing
-at the pan and tapping a foot while steam rises from the pot.
+orange Claude Code mascot (drawn exactly as Claude Code draws him in its header, at
+twice the size), stands between a prep table and a stove, in a chef hat: breathing,
+blinking, glancing at the table and the pot, while steam rises from the pot.
 
 > Unofficial fan project, not affiliated with Anthropic. See [NOTICE.md](NOTICE.md).
 
-**Status: v0.1 in progress.** Idle, typing (chopping at a prep table you pull
-over), thinking (browsing dishes on a phone and cooking them), simmering while the answer
-streams, cooking with Bash, seasoning on edits, serving finished dishes, burnt dish
-on error, and sleeping work. Sound, petting and a compact mode are being added
-one at a time, each only once it looks and sounds right.
+**Status: v0.2 in progress.** The kitchen has two stages. **v3**, the default, is
+animated the way an animator times it (24 frames a second, each drawing held for a
+whole number of frames, squash and stretch, a hat that floats and lands) and has
+every mood: idle, typing (every key is a chop), thinking, simmering while the answer
+streams, stirring on Bash, seasoning on edits, serving, a burnt pot on error and
+sleeping. **v2**, the earlier 80 ms kitchen, is still there as `/clawd v2`. Sound,
+petting and a compact mode are being added one at a time, each only once it looks
+and sounds right.
 
 ## Requirements
 
 - **Claude Code** with plugin hooks (mods) support. Built and tested on 2.1.300.
 - **A terminal with truecolor**: Konsole, kitty, WezTerm, Alacritty, GNOME
   Terminal, iTerm2, Windows Terminal.
-- **At least about 57 columns.** In a narrower terminal the kitchen hides itself.
+- **At least 80 columns** for v3. In a narrower terminal the v2 kitchen is shown
+  instead (about 57 columns), and below that nothing.
 - **A font with proper braille glyphs.** Steam, sparkles and zzz are drawn with
   braille dots. See [Fonts](#fonts) below.
 
@@ -119,50 +124,55 @@ Nothing to do: Clawd, in a chef hat, appears above the prompt when a session sta
 
 | What Clawd does | When |
 |---|---|
-| Breathes (the top of the body glows, arms lift on the inhale, a settle on the exhale with the hat a beat late), blinks (sometimes twice), and now and then glances at the pan and pot, taps a foot, stretches, adjusts his hat or hops | Idle |
-| Leans away and tugs the prep table over from the left, then chops meat, cucumber and carrot: the body stretches with the knife, crouches as it cuts, and each slice flies an arc onto a fanned pile | You are typing in the prompt |
-| Scrolls through dishes on a phone in his left hand, with a bubble above it showing the dish; then winds up and tosses its ingredient in an arc into the pan (burger, egg, with three splashing drops) or the pot (ramen, the lid popping twice) with his right hand | Claude is thinking |
-| Leans toward the pot and watches it, the lid rattling at uneven intervals with steam squeezing out and bubbles popping | The answer is streaming in |
-| Grips the pan's handle, crouches, and tosses it over the flames: three bits of food on different arcs, landing one after another | Claude runs a Bash command |
-| Holds a shaker high and shakes salt that falls into the pan, then nods | Claude edits or writes a file |
-| Pulls the table over, watches the dish drop and bounce twice on a plate, then cheers and hops while sparkles twinkle | An answer is served |
-| Is startled, coughs while fanning dark smoke away from a burnt pan, then droops | Claude errors or refuses |
-| Dozes with slow deep breaths, the hat slipping, while z's float up | Quiet for five minutes |
+| Breathes (the head rises half a model pixel, the hat pressed by it and floating on a beat), blinks, glances at the pot or the table, and now and then hops or stretches | Idle |
+| Notices the prep table at the left, steps over and tugs it to the board in two tugs; then **every key is a chop**: he jumps with the knife, strikes, and a slice flies onto the pile. Typing fast gives quick chops, every fourth chop (or a paste) is a power chop, and with no keys he holds the knife ready, then puts it down | You are typing in the prompt |
+| Holds up a phone with its screen scrolling, his eyes on it, and a comic thought bubble grows over his hat: two small bubbles, a cloud, and three dots coming one at a time | Claude is thinking |
+| Stirs the pot slowly, bubbles popping, steam rising, content | The answer is streaming in |
+| Stirs fast, leaning into it, the soup spitting | Claude runs a Bash command |
+| Shakes a shaker four times over the pot, flakes falling into the soup, then a happy flourish | Claude edits or writes a file |
+| Crouches, springs up and holds a plate high (a roast, a salad or a cake, in turn) with sparkles and a floating hat, then bows | An answer is served |
+| Coughs three times, fanning the smoke from a burnt pot with his arms | Claude errors or refuses |
+| Yawns, stretches, slumps, and breathes slowly while Zs float up | Quiet for five minutes |
 
-### Command
+### Commands
 
-`/clawd` prints what Clawd currently sees, for example
-`Clawd is in the simmer mood · answer text pieces: 42 · table: -9`. If Clawd
-does not react while the answer streams, run it right after the answer: a
-count of 0 means the mod was not told about the text.
+`/clawd` prints what Clawd currently sees and how fast the band is redrawn, for example
+`Clawd is in the simmer mood · answer text pieces: 42 · table: -9 · v3 stage: last 240 redraw gaps, median 21 ms, longest 45 ms`.
+If Clawd does not react while the answer streams, run it right after the answer: a
+count of 0 means the mod was not told about the text. `/clawd v2` switches to the
+earlier kitchen for the session's state, `/clawd v3` back.
 
 ## Development
 
 ```bash
-python3 tools/build.py          # sprites/*.txt + scenes.json → hooks/gen/data.ts
-python3 -m pytest -q tests      # sprite format
+python3 tools/build.py          # sprites/*.txt, sprites/v3/*.txt → hooks/gen/data.ts, hooks/gen/v3.ts
+python3 -m pytest -q tests      # sprite format (anchors, @scale, @shade, two-colour check)
 claude plugin test .            # hooks logic
 claude plugin validate .
-python3 tools/gif.py typing 5400 80     # preview/out/typing.gif: <mood> [ms] [step], rendered by the mod's own code
-python3 tools/strip.py stir 1200 80     # preview/out/stir-strip.png: one picture per tick, to judge a motion
-pnpm dlx tsx@4.19.2 tools/live_preview.ts stir 10   # plays a mood in this terminal at the mod's own tick rate
+npx -y -p typescript@5.6.3 tsc -p . --noEmit
+
+# v3 previews, rendered by the mod's own code (V3_ASKS, V3_LEAVE, V3_MOOD choose what plays)
+V3_ASKS="0,67,68,69" python3 tools/v3_gif.py sheet "chop:67:16" preview/out/chop.png
+V3_MOOD=thinking python3 tools/v3_gif.py gif 0 120 preview/out/thinking.gif
+pnpm dlx tsx@4.19.2 tools/v3_live.ts 30     # plays the stage in this terminal at 24 fps
 ```
 
-`tools/gif.py` runs `tools/frames.ts` through `pnpm dlx tsx` and draws the
-cells like a terminal does, so previews match what the mod shows.
-
-The scene is 104×16 pixels (52 cells by 8 rows). Claude Code accepts only
+The v3 stage is 160×32 pixels (80 cells by 16 rows). Claude Code accepts only
 code points in the Basic Multilingual Plane, so quadrants are the finest
-blocks available (sextants and octants would be refused). Art is drawn on the
-cell grid so that no cell needs a third colour; `hooks/art.test.ts` checks
-that, and that Clawd's eyes survive the encoding, in every mood.
+blocks available (sextants and octants would be refused). Every terminal cell shows
+one foreground and one background colour, so the art is drawn to keep each cell to
+two: props in 2×2 blocks (`@scale 2`, with `@shade` to light the top edge and
+darken the bottom edge of each block), Clawd on the model Claude Code draws.
+`hooks/v3.*.test.ts` check that on every frame of every mood.
 
-Sprites are plain text in `sprites/`: `palette.txt` maps one character to one
-colour, `.` is transparent, and `@frame <name>` starts each frame. Clawd is
-assembled from parts (`clawd_body`, `clawd_arm`, `clawd_leg`, `clawd_eye`) by
-`hooks/lib/clawd.ts`, so new poses need no new drawings. Each mood's motion is
-a pure function of time in `hooks/lib/motion/`, built from held keyframes of
-whole 80 ms ticks; `hooks/lib/actions.ts` chooses between them.
+Sprites are plain text: `palette.txt` maps one character to one colour, `.` is
+transparent, `@frame <name>` starts each frame, `@anchor` marks the points parts
+attach to. v3 timing is in `hooks/v3/time.ts` (exposure sheets and spacing charts),
+the rig in `hooks/v3/clawd.ts`, the idle, typing (`chop.ts`) and turn moods
+(`moods.ts`) are pure functions of frames, and `hooks/v3/stage.ts` draws them. The
+design is in `docs/superpowers/specs/2026-10-18-anime-timing-typing-design.md`. v2 lives
+in `hooks/lib/` and `sprites/*.txt`, with previews through `tools/gif.py` and
+`tools/strip.py`.
 
 To work on it with hot reload, run `claude --plugin-dir .` from the repo.
 
